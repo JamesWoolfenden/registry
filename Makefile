@@ -71,5 +71,7 @@ clean: ## Clean build artifacts and coverage files
 	rm -rf bin
 	rm -f coverage.out coverage.html
 
+clean-db: # Stop containers and remove volumes (clears all data)
+	docker compose down -v --remove-orphans
 
 .DEFAULT_GOAL := help
