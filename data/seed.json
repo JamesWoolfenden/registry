@@ -1,161 +1,78 @@
-[
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-    "name": "io.github.domdomegg/airtable-mcp-server",
-    "description": "Read and write access to Airtable database schemas, tables, and records.",
-    "repository": {
-      "url": "https://github.com/domdomegg/airtable-mcp-server.git",
-      "source": "github"
-    },
-    "version": "1.7.2",
-    "icons": [
-      {
-        "src": "https://airtable.com/images/favicon/favicon-32x32.png",
-        "mimeType": "image/png",
-        "sizes": ["32x32"]
-      }
+[]
+    "name": "io.github.21st-dev/magic-mcp",
+    "name": "io.github.adfin-engineering/mcp-server-adfin",
+    "description": "A Model Context Protocol Server for connecting with Adfin APIs ",
+      "url": "https://github.com/Adfin-Engineering/mcp-server-adfin",
+      "source": "github",
+        "version": "0.1.0",
+        "transport": {
+      "url": "https://github.com/tinyfish-io/agentql-mcp",
+        "registryType": "npm",
+          "type": "stdio"
+        "identifier": "agentrpc",
+        "version": "1.0.0",
+        "packageArguments": [
+            "description": "host",
+            "description": "Your Access Key ID",
+            "isRequired": true,
+            "name": "IOTDB_DATABASE"
+        ],
+    "name": "io.github.apify/actors-mcp-server",
+        "version": "0.1.31",
+            "format": "string",
+    "description": "Audiense Insights MCP Server is a server based on the Model Context Protocol (MCP) that allows Claude and other MCP-compatible clients to interact with your Audiense Insights account",
+            "isRequired": true,
+            "name": "BICSCAN_API_KEY"
+        ],
+      "source": "github",
+            "default": "git+https://github.com/bitrise-io/bitrise-mcp@v1.1.0",
+        "version": "0.1.0",
+        "packageArguments": [
     ],
-    "packages": [
-      {
-        "registryType": "npm",
-        "identifier": "airtable-mcp-server",
-        "version": "1.7.2",
-        "runtimeHint": "npx",
-        "transport": {
-          "type": "stdio"
-        },
-        "environmentVariables": [
-          {
-            "description": "Airtable personal access token (e.g., pat123.abc123). Create at https://airtable.com/create/tokens/new with scopes: schema.bases:read, data.records:read, and optionally schema.bases:write and data.records:write.",
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+    "name": "io.github.chroma-core/chroma-mcp",
+    "description": "A Model Context Protocol (MCP) server implementation that provides database capabilities for Chroma",
+      "url": "https://github.com/chroma-core/chroma-mcp",
+      "source": "github",
+        "version": "0.2.2",
+        "identifier": "@circleci/mcp-server-circleci",
+        "version": "0.1.7",
+    "description": "",
+    "description": "Model Context Protocol (MCP) implementation for Opik enabling seamless IDE integration and unified access to prompts, projects, traces, and metrics. ",
             "isRequired": true,
-            "isSecret": true,
-            "name": "AIRTABLE_API_KEY"
-          }
-        ]
-      },
-      {
+            "value": "YOUR_API_KEY",
+        ],
+    "name": "io.github.its-dart/dart-mcp-server",
+        "version": "0.1.13",
+            "description": "--rm",
+    "description": "The EduBase MCP server enables Claude and other LLMs to interact with EduBase's comprehensive e-learning platform through the Model Context Protocol (MCP).",
+            "isRequired": true,
+            "value": "EDUBASE_API_URL",
+        ],
         "registryType": "oci",
-        "identifier": "domdomegg/airtable-mcp-server",
-        "version": "1.7.2",
-        "runtimeHint": "docker",
-        "transport": {
-          "type": "stdio"
-        },
-        "environmentVariables": [
-          {
-            "description": "Airtable personal access token (e.g., pat123.abc123). Create at https://airtable.com/create/tokens/new with scopes: schema.bases:read, data.records:read, and optionally schema.bases:write and data.records:write.",
-            "isRequired": true,
-            "isSecret": true,
-            "name": "AIRTABLE_API_KEY"
-          }
-        ]
-      },
-      {
-        "registryType": "mcpb",
-        "identifier": "https://github.com/domdomegg/airtable-mcp-server/releases/download/v1.7.2/airtable-mcp-server.mcpb",
-        "version": "1.7.2",
-        "fileSha256": "8220de07a08ebe908f04da139ea03dbfe29758141347e945da60535fb7bcca20",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-  {
+      "url": "https://github.com/elastic/mcp-server-elasticsearch",
+        "version": "0.1.1",
+        "packageArguments": [
+    ],
     "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-    "name": "io.github.domdomegg/airtable-mcp-server",
-    "description": "Read and write access to Airtable database schemas, tables, and records.",
-    "repository": {
-      "url": "https://github.com/domdomegg/airtable-mcp-server.git",
-      "source": "github"
-    },
-    "version": "1.7.3",
-    "packages": [
-      {
+    "name": "io.github.esignaturescom/mcp-server-esignatures",
+    "description": "MCP server for eSignatures (https://esignatures.com)",
+      "url": "https://github.com/esignaturescom/mcp-server-esignatures",
+      "source": "github",
+        "version": "0.1.0",
         "registryType": "npm",
-        "identifier": "airtable-mcp-server",
-        "version": "1.7.3",
-        "runtimeHint": "npx",
-        "transport": {
-          "type": "stdio"
-        },
-        "environmentVariables": [
-          {
-            "description": "Airtable personal access token (e.g., pat123.abc123). Create at https://airtable.com/create/tokens/new with scopes: schema.bases:read, data.records:read, and optionally schema.bases:write and data.records:write.",
-            "isRequired": true,
-            "isSecret": true,
-            "name": "AIRTABLE_API_KEY"
-          }
-        ]
-      },
-      {
-        "registryType": "oci",
-        "identifier": "domdomegg/airtable-mcp-server",
-        "version": "1.7.3",
-        "runtimeHint": "docker",
-        "transport": {
-          "type": "stdio"
-        },
-        "environmentVariables": [
-          {
-            "description": "Airtable personal access token (e.g., pat123.abc123). Create at https://airtable.com/create/tokens/new with scopes: schema.bases:read, data.records:read, and optionally schema.bases:write and data.records:write.",
-            "isRequired": true,
-            "isSecret": true,
-            "name": "AIRTABLE_API_KEY"
-          }
-        ]
-      },
-      {
-        "registryType": "mcpb",
-        "identifier": "https://github.com/domdomegg/airtable-mcp-server/releases/download/v1.7.3/airtable-mcp-server.mcpb",
-        "version": "1.7.3",
-        "fileSha256": "0f28a9129cfebd262dfb77854c872355d21401bb3e056575b3027081f5d570ca",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-    "name": "io.github.domdomegg/time-mcp-nuget",
-    "description": "Get the current UTC time in RFC 3339 format.",
-    "repository": {
-      "url": "https://github.com/domdomegg/time-mcp-nuget.git",
-      "source": "github"
-    },
-    "version": "1.0.8",
-    "packages": [
-      {
-        "registryType": "nuget",
-        "identifier": "TimeMcpServer",
-        "version": "1.0.8",
-        "runtimeHint": "dnx",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  },
-  {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-    "name": "io.github.domdomegg/time-mcp-pypi",
-    "description": "Get the current UTC time in RFC 3339 format.",
-    "repository": {
-      "url": "https://github.com/domdomegg/time-mcp-pypi.git",
-      "source": "github"
-    },
-    "version": "1.0.6",
-    "packages": [
-      {
-        "registryType": "pypi",
-        "identifier": "time-mcp-pypi",
-        "version": "1.0.6",
-        "runtimeHint": "python",
-        "transport": {
-          "type": "stdio"
-        }
-      }
-    ]
-  }
-]
+        "identifier": "exa-mcp-server",
+        "version": "0.1.4",
+    "description": "",
+    ],
+      "url": "https://github.com/financial-datasets/mcp-server",
+    "name": "io.github.mendableai/firecrawl-mcp-server",
+    "name": "io.github.fireproof-storage/mcp-database-server",
+      "url": "https://github.com/fireproof-storage/mcp-database-server",
+      "source": "github",
+    "version": "0.0.1-seed",
+        "identifier": "todos",
+        "version": "0.6.1",
+            "type": "positional",
+    ],
+    }
