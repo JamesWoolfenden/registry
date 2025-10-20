@@ -2,7 +2,6 @@
 // by fetching production data from the public registry API.
 // It is not intended for production use.
 //
-//go:build ignore
 
 package main
 
@@ -10,21 +9,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
 )
 
+const exportData = "scripts/mirror_data/fetch/production_servers.json"
+const 	baseURL  = "https://registry.modelcontextprotocol.io/v0/servers"
+
 type ServerResponse struct {
 	Servers  []json.RawMessage `json:"servers"`
 	Metadata struct {
-		NextCursor string `json:"next_cursor,omitempty"`
+		NextCursor string `json:"nextCursor,omitempty"`
 		Count      int    `json:"count"`
 	} `json:"metadata"`
 }
 
 func main() {
-	baseURL := "https://registry.modelcontextprotocol.io/v0/servers"
+
 	var allServers []json.RawMessage
 	cursor := ""
 	pageCount := 0
@@ -32,6 +35,7 @@ func main() {
 	for {
 		pageCount++
 		url := baseURL
+		
 		if cursor != "" {
 			url = fmt.Sprintf("%s?cursor=%s", baseURL, cursor)
 		}
@@ -39,10 +43,17 @@ func main() {
 		fmt.Printf("Fetching page %d: %s\n", pageCount, url)
 
 		resp, err := http.Get(url)
+		
 		if err != nil {
 			panic(fmt.Sprintf("Failed to fetch: %v", err))
 		}
-		defer resp.Body.Close()
+		
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				log.Printf("Failed to close body: %v", err)
+			}
+		}(resp.Body)
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -50,8 +61,9 @@ func main() {
 		}
 
 		var serverResp ServerResponse
+		
 		if err := json.Unmarshal(body, &serverResp); err != nil {
-			panic(fmt.Sprintf("Failed to parse JSON: %v", err))
+			log.Fatalf("Failed to parse JSON: %v", err)
 		}
 
 		allServers = append(allServers, serverResp.Servers...)
@@ -75,13 +87,12 @@ func main() {
 
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		panic(fmt.Sprintf("Failed to marshal output: %v", err))
+		log.Fatalf("Failed to marshal output: %v", err)
+	}
+	
+	if err := os.WriteFile(exportData, data, 0644); err != nil {
+		log.Fatalf("Failed to write file: %v", err)
 	}
 
-	outputFile := "production_servers.json"
-	if err := os.WriteFile(outputFile, data, 0644); err != nil {
-		panic(fmt.Sprintf("Failed to write file: %v", err))
-	}
-
-	fmt.Printf("\nDone! Saved %d servers to %s\n", len(allServers), outputFile)
+	fmt.Printf("\nDone! Saved %d servers to %s\n", len(allServers), exportData)
 }
