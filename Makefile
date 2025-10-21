@@ -32,7 +32,7 @@ test-unit: ## Run unit tests with coverage (requires PostgreSQL)
 	@echo "Waiting for PostgreSQL to be ready..."
 	@sleep 3
 	@echo "Running unit tests..."
-	go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/...
+	go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/... ./cmd/...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 	@echo "Stopping PostgreSQL..."
@@ -76,6 +76,9 @@ check: dev-down lint validate test-all ## Run all checks (lint, validate, unit t
 
 # Development targets
 dev-compose: ## Start development environment with Docker Compose (builds image automatically)
+	GIT_COMMIT=$$(git rev-parse HEAD) \
+	GIT_COMMIT_SHORT=$$(git rev-parse --short HEAD) \
+	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
 	docker compose up --build
 
 dev-down: ## Stop development environment
