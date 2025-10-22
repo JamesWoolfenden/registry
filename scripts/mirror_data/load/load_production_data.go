@@ -9,7 +9,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -19,8 +21,10 @@ import (
 
 const exportData = "scripts/mirror_data/fetch/production_servers.json"
 const skipMigrations = true
-const dataSource="postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"
+const dataSource = "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"
+const baseURL = "http://localhost:8080/v0/servers"
 
+//const baseURL = "https://registry.modelcontextprotocol.io/v0/servers"
 
 func main() {
 	// Database connection
@@ -57,7 +61,7 @@ func verify(db *sql.DB, maxMigration int) {
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&count)
 	if err != nil {
-		return 
+		return
 	}
 	fmt.Printf("\nTotal servers in database: %d\n", count)
 
@@ -89,7 +93,7 @@ func verify(db *sql.DB, maxMigration int) {
 		var total, nullStatus, emptyStatus, stringNullStatus, activeStatus, deprecatedStatus, deletedStatus int
 		err := rows.Scan(&total, &nullStatus, &emptyStatus, &stringNullStatus, &activeStatus, &deprecatedStatus, &deletedStatus)
 		if err != nil {
-			return 
+			return
 		}
 
 		fmt.Printf("  Total servers: %d\n", total)
@@ -121,7 +125,7 @@ func verify(db *sql.DB, maxMigration int) {
 			var name, version string
 			err := rows.Scan(&name, &version)
 			if err != nil {
-				return 
+				return
 			}
 			fmt.Printf("  - %s@%s\n", name, version)
 		}
@@ -154,12 +158,12 @@ func importer(db *sql.DB) error {
 
 	// Prepare insert statement
 	stmt, err := db.Prepare("INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
-	
+
 	if err != nil {
 		log.Fatal("Failed to prepare statement:", err)
 		return err
 	}
-	
+
 	defer func(stmt *sql.Stmt) {
 		err := stmt.Close()
 		if err != nil {
@@ -169,6 +173,7 @@ func importer(db *sql.DB) error {
 
 	// Insert each server
 	for i, server := range prodData.Servers {
+
 		// Generate a unique version_id
 		versionID := uuid.New().String()
 
@@ -180,25 +185,90 @@ func importer(db *sql.DB) error {
 		}
 
 		parsed := rawText["server"].(map[string]interface{})
+		value, err := json.Marshal(parsed)
+
+		if err != nil {
+			return err
+		}
+
 		serverName := parsed["name"].(string)
+		version := parsed["version"].(string)
 
 		meta := rawText["_meta"].(map[string]interface{})
-		mcp:= meta["io.modelcontextprotocol.registry/official"].(map[string]interface{})
-		
+		mcp := meta["io.modelcontextprotocol.registry/official"].(map[string]interface{})
+
 		publishedAt := mcp["publishedAt"]
 		updatedAt := mcp["updatedAt"]
 		isLatest := mcp["isLatest"]
 
-		// The server data is already JSON, just insert it
-		if _, err := stmt.Exec(versionID, serverName, publishedAt, updatedAt, isLatest, server); err != nil {
-			log.Printf("Failed to insert server %d: %v", i, err)
-			continue
+		if checkExists(serverName, version) {
+			log.Println("Skipping duplicate server version:", serverName, version)
+		} else {
+			// The server data is already JSON, just insert it
+			//log.Printf("versionID %s, serverName %s , publishedAt %s, updatedAt %s, isLatest %s, value %s", versionID, serverName, publishedAt, updatedAt, isLatest, value)
+			_, err := stmt.Exec(versionID, serverName, publishedAt, updatedAt, isLatest, value)
+
+			if err != nil {
+				log.Printf("Failed to insert server %d: %v", i, err)
+				continue
+			}
+
+			log.Printf("Inserted server %d: %v", i, serverName)
 		}
-		log.Printf("Inserted server %d: %v", i, serverName)
+
 	}
 
 	fmt.Println("Data loaded successfully!")
 	return nil
+}
+
+func checkExists(serverName string, version string) bool {
+
+	//example
+	//https://registry.modelcontextprotocol.io/v0/servers?search=ai.aliengiraffe/spotdb&version=0.1.0
+	req, err := http.NewRequest("GET", baseURL, nil)
+	if err != nil {
+		return false
+	}
+
+	q := req.URL.Query()
+	q.Add("search", serverName)
+	q.Add("version", version)
+	req.URL.RawQuery = q.Encode()
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return false
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Failed to close body: %v", err)
+		}
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read body: %v", err)
+	}
+	var serverResp map[string]interface{}
+
+	if err := json.Unmarshal(body, &serverResp); err != nil {
+		log.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	//if it's found more than no servers it does exist
+	if len(serverResp["servers"].([]interface{})) > 0 {
+		return true
+	}
+
+	return false
 }
 
 func migrate(db *sql.DB) int {

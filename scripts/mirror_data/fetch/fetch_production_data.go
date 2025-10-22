@@ -16,7 +16,7 @@ import (
 )
 
 const exportData = "scripts/mirror_data/fetch/production_servers.json"
-const 	baseURL  = "https://registry.modelcontextprotocol.io/v0/servers"
+const baseURL = "https://registry.modelcontextprotocol.io/v0/servers"
 
 type ServerResponse struct {
 	Servers  []json.RawMessage `json:"servers"`
@@ -35,7 +35,7 @@ func main() {
 	for {
 		pageCount++
 		url := baseURL
-		
+
 		if cursor != "" {
 			url = fmt.Sprintf("%s?cursor=%s", baseURL, cursor)
 		}
@@ -43,11 +43,11 @@ func main() {
 		fmt.Printf("Fetching page %d: %s\n", pageCount, url)
 
 		resp, err := http.Get(url)
-		
+
 		if err != nil {
-			panic(fmt.Sprintf("Failed to fetch: %v", err))
+			log.Fatalf("Failed to fetch: %v", err)
 		}
-		
+
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -57,11 +57,11 @@ func main() {
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			panic(fmt.Sprintf("Failed to read body: %v", err))
+			log.Fatalf("Failed to read body: %v", err)
 		}
 
 		var serverResp ServerResponse
-		
+
 		if err := json.Unmarshal(body, &serverResp); err != nil {
 			log.Fatalf("Failed to parse JSON: %v", err)
 		}
@@ -89,7 +89,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to marshal output: %v", err)
 	}
-	
+
 	if err := os.WriteFile(exportData, data, 0644); err != nil {
 		log.Fatalf("Failed to write file: %v", err)
 	}
