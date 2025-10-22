@@ -1,14 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -61,10 +61,19 @@ func loadConfig() *Config {
 	}
 }
 
-//const baseURL = "https://registry.modelcontextprotocol.io/v0/servers"
-
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	// Create context with timeout
+	err := transaction()
+	if err != nil {
+		log.Fatal().Err(err).Msg("load failed")
+	}
+}
+
+func transaction() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
 
 	config := loadConfig()
 
@@ -72,44 +81,67 @@ func main() {
 	db, err := sql.Open("postgres", config.DataSource)
 
 	if err != nil {
-		log.Fatal().Msgf("failed to connect to database: %v", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	defer func(db *sql.DB) {
 		err := db.Close()
 		if err != nil {
-			log.Fatal().Msgf("Failed to close database: %v", err)
+			log.Error().Msgf("Failed to close database: %v", err)
 		}
 	}(db)
 
 	var maxMigration = 0
 	// Run migrations up to a specific point (configure as needed)
 	if !(config.SkipMigrations) {
-		maxMigration = migrate(db)
+		maxMigration, err = migrateWithContext(ctx, db)
+		if err != nil {
+			return fmt.Errorf("migration failed: %w", err)
+		}
 	}
 
-	err = importer(db)
+	err = importerWithContext(ctx, db)
 
 	if err != nil {
-		log.Fatal().Msgf("failed to import production server data: %v", err)
+		return fmt.Errorf("failed to import production server data: %w", err)
 	}
 
-	verify(db, maxMigration)
+	err = verifyWithContext(ctx, db, maxMigration)
+	if err != nil {
+		return fmt.Errorf("verification failed: %w", err)
+	}
+	return nil
 }
 
-func verify(db *sql.DB, maxMigration int) {
+// Updated database helpers with context
+func checkExistsInDB(ctx context.Context, db *sql.DB, serverName, version string) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM servers 
+		WHERE server_name = $1 AND value->>'version' = $2
+	`, serverName, version).Scan(&count)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check if server exists: %w", err)
+	}
+	return count > 0, nil
+}
+
+// Updated verify function with context
+func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error {
 	// Verify the data
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&count)
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM servers").Scan(&count)
 	if err != nil {
-		return
+		return fmt.Errorf("failed to count servers: %w", err)
 	}
 	log.Info().Msgf("\nTotal servers in database: %d\n", count)
 
-	// Check for NULL status values in the JSON
-	log.Info().Msg("\nAnalyzing status field in JSON data...")
+	// Check for NULL status values in the JSON with context
+	log.Info().Msg("Analyzing status field in JSON data...")
 
-	rows, err := db.Query(`
+	rows, err := db.QueryContext(ctx, `
 		SELECT
 			COUNT(*) as total,
 			COUNT(CASE WHEN value->>'status' IS NULL THEN 1 END) as null_status,
@@ -120,69 +152,74 @@ func verify(db *sql.DB, maxMigration int) {
 			COUNT(CASE WHEN value->>'status' = 'deleted' THEN 1 END) as deleted_status
 		FROM servers
 	`)
+
 	if err != nil {
-		log.Fatal().Msgf("failed to analyze data: %v", err)
+		return fmt.Errorf("failed to analyze data: %w", err)
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			log.Fatal().Msgf("Failed to close rows: %v", err)
-		}
-	}(rows)
+
+	defer rows.Close()
+
+	if rows.Err() != nil {
+		return fmt.Errorf("failed to analyze data: %w", rows.Err())
+	}
 
 	if rows.Next() {
 		var total, nullStatus, emptyStatus, stringNullStatus, activeStatus, deprecatedStatus, deletedStatus int
 		err := rows.Scan(&total, &nullStatus, &emptyStatus, &stringNullStatus, &activeStatus, &deprecatedStatus, &deletedStatus)
 		if err != nil {
-			return
+			return fmt.Errorf("failed to scan analysis results: %w", err)
 		}
 
-		fmt.Printf("  Total servers: %d\n", total)
-		fmt.Printf("  NULL status: %d\n", nullStatus)
-		fmt.Printf("  Empty status: %d\n", emptyStatus)
-		fmt.Printf("  'null' string status: %d\n", stringNullStatus)
-		fmt.Printf("  'active' status: %d\n", activeStatus)
-		fmt.Printf("  'deprecated' status: %d\n", deprecatedStatus)
-		fmt.Printf("  'deleted' status: %d\n", deletedStatus)
-		fmt.Printf("  Other/Invalid: %d\n", total-nullStatus-emptyStatus-stringNullStatus-activeStatus-deprecatedStatus-deletedStatus)
+		log.Info().Msgf("  Total servers: %d", total)
+		log.Info().Msgf("  NULL status: %d", nullStatus)
+		log.Info().Msgf("  Empty status: %d", emptyStatus)
+		log.Info().Msgf("  'null' string status: %d", stringNullStatus)
+		log.Info().Msgf("  'active' status: %d", activeStatus)
+		log.Info().Msgf("  'deprecated' status: %d", deprecatedStatus)
+		log.Info().Msgf("  'deleted' status: %d", deletedStatus)
+		log.Info().Msgf("  Other/Invalid: %d", total-nullStatus-emptyStatus-stringNullStatus-activeStatus-deprecatedStatus-deletedStatus)
 	}
 
-	// Print sample servers with no status
-	fmt.Println("\nSample servers with NULL status:")
-	rows, err = db.Query(`
+	// Print sample servers with no status using context
+	log.Info().Msg("Sample servers with NULL status:")
+	rows, err = db.QueryContext(ctx, `
 		SELECT value->>'name', value->>'version'
 		FROM servers
 		WHERE value->>'status' IS NULL
 		LIMIT 5
 	`)
+
 	if err == nil {
-		defer func(rows *sql.Rows) {
-			err := rows.Close()
-			if err != nil {
-				log.Fatal().Msgf("failed to close rows:%v", err)
-			}
-		}(rows)
+		defer rows.Close()
 		for rows.Next() {
 			var name, version string
 			err := rows.Scan(&name, &version)
 			if err != nil {
-				return
+				return fmt.Errorf("failed to scan sample data: %w", err)
 			}
-			log.Info().Msgf("  - %s@%s\n", name, version)
+			log.Info().Msgf("  - %s@%s", name, version)
 		}
 	}
 
-	fmt.Printf("\nDatabase is ready for testing migration %03d!\n", maxMigration+1)
+	defer rows.Close()
+
+	if rows.Err() != nil {
+		return fmt.Errorf("failed to analyze data: %w", err)
+	}
+
+	log.Info().Msgf("Database is ready for testing migration %03d!\n", maxMigration+1)
+	return nil
 }
 
-func importer(db *sql.DB) error {
-	tx, err := db.Begin()
+// Updated importer with context
+func importerWithContext(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 
@@ -210,28 +247,23 @@ func importer(db *sql.DB) error {
 	log.Info().Msgf("Loading %d servers...\n", len(prodData.Servers))
 
 	// Prepare insert statement
-	stmt, err := tx.Prepare("INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
 
 	if err != nil {
-		log.Fatal().Msgf("failed to prepare statement: %v", err)
+		log.Error().Msgf("failed to prepare statement: %v", err)
 		return err
 	}
 
-	defer func(stmt *sql.Stmt) {
-		err := stmt.Close()
-		if err != nil {
-			log.Info().Msgf("failed to close statement: %v", err)
-		}
-	}(stmt)
+	defer stmt.Close()
+
 	// Insert each server
 	for i, server := range prodData.Servers {
-
 		// Generate a unique version_id
 		versionID := uuid.New().String()
 
 		var rawText map[string]interface{}
 		if err := json.Unmarshal(server, &rawText); err != nil {
-			log.Printf("Failed to unmarshal server %d: %v", i, err)
+			log.Info().Msgf("Failed to unmarshal server %d: %v", i, err)
 			continue
 		}
 
@@ -266,7 +298,7 @@ func importer(db *sql.DB) error {
 		updatedAt := mcp["updatedAt"]
 		isLatest := mcp["isLatest"]
 
-		exists, err := checkExistsInDB(db, serverName, version)
+		exists, err := checkExistsInDB(ctx, db, serverName, version)
 		if err != nil {
 			log.Info().Msgf("Failed to check if server exists at index %d: %v", i, err)
 			continue
@@ -276,7 +308,7 @@ func importer(db *sql.DB) error {
 			log.Info().Msgf("skipping duplicate server %s version: %s", serverName, version)
 		} else {
 			// The server data is already JSON, just insert it
-			_, err := stmt.Exec(versionID, serverName, publishedAt, updatedAt, isLatest, value)
+			_, err := stmt.ExecContext(ctx, versionID, serverName, publishedAt, updatedAt, isLatest, value)
 
 			if err != nil {
 				log.Info().Msgf("Failed to insert server %d: %v", i, err)
@@ -285,88 +317,45 @@ func importer(db *sql.DB) error {
 
 			log.Info().Msgf("Inserted server %d: %v", i, serverName)
 		}
-
 	}
+
 	log.Info().Msg("Data loaded successfully!")
 	return tx.Commit()
 }
 
-func checkExists(serverName string, version string) bool {
-
-	config := loadConfig()
-
-	//example
-	//https://registry.modelcontextprotocol.io/v0/servers?search=ai.aliengiraffe/spotdb&version=0.1.0
-	req, err := http.NewRequest("GET", config.BaseURL, nil)
-	if err != nil {
-		return false
-	}
-
-	q := req.URL.Query()
-	q.Add("search", serverName)
-	q.Add("version", version)
-	req.URL.RawQuery = q.Encode()
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		return false
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Info().Msgf("Failed to close body: %v", err)
-		}
-	}(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return false
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal().Msgf("Failed to read body: %v", err)
-	}
-	var serverResp map[string]interface{}
-
-	if err := json.Unmarshal(body, &serverResp); err != nil {
-		log.Fatal().Msgf("Failed to parse JSON: %v", err)
-	}
-
-	//if it's found more than no servers it does exist
-	if len(serverResp["servers"].([]interface{})) > 0 {
-		return true
-	}
-
-	return false
-}
-
-func migrate(db *sql.DB) int {
+// Updated migrate function with context
+func migrateWithContext(ctx context.Context, db *sql.DB) (int, error) {
 	maxMigration := 7 // Change this to test different migration states
 
 	log.Info().Msgf("Running migrations 001-%03d...\n", maxMigration)
 
 	migrationsDir := "internal/database/migrations"
 	for i := 1; i <= maxMigration; i++ {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return i - 1, ctx.Err()
+		default:
+		}
+
 		migrationFile := filepath.Join(migrationsDir, fmt.Sprintf("%03d_*.sql", i))
 		files, err := filepath.Glob(migrationFile)
 
 		if err != nil || len(files) == 0 {
-			log.Fatal().Msgf("Migration file %d not found", i)
+			return i - 1, fmt.Errorf("migration file %d not found", i)
 		}
 
 		content, err := os.ReadFile(files[0])
 		if err != nil {
-			log.Fatal().Msgf("Failed to read migration %d: %v", i, err)
+			return i - 1, fmt.Errorf("failed to read migration %d: %w", i, err)
 		}
 
-		fmt.Printf("  Applying migration %d: %s\n", i, filepath.Base(files[0]))
-		if _, err := db.Exec(string(content)); err != nil {
-			log.Fatal().Msgf("Failed to apply migration %d: %v", i, err)
+		log.Info().Msgf("  Applying migration %d: %s\n", i, filepath.Base(files[0]))
+		if _, err := db.ExecContext(ctx, string(content)); err != nil {
+			return i - 1, fmt.Errorf("failed to apply migration %d: %w", i, err)
 		}
 	}
-	return maxMigration
+	return maxMigration, nil
 }
 
 func safeStringFromMap(m map[string]interface{}, key string) (string, error) {
@@ -391,14 +380,4 @@ func safeMapFromMap(m map[string]interface{}, key string) (map[string]interface{
 		return nil, fmt.Errorf("key %s is not a map", key)
 	}
 	return mapVal, nil
-}
-
-func checkExistsInDB(db *sql.DB, serverName, version string) (bool, error) {
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM servers WHERE server_name = $1 AND value->>'version' = $2",
-		serverName, version).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }
