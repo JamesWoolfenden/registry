@@ -1,8 +1,3 @@
-// This tool was created by Claude Code as a simple way to kick the tires on data migrations
-// by fetching production data from the public registry API.
-// It is not intended for production use.
-//
-
 package main
 
 import (

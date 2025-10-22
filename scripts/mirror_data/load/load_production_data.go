@@ -1,8 +1,3 @@
-// This tool was created by Claude Code as a simple way to kick the tires on data migrations
-// by loading production data into a test database for migration testing.
-// It is not intended for production use.
-//
-
 package main
 
 import (
@@ -10,47 +5,93 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
-const exportData = "scripts/mirror_data/fetch/production_servers.json"
-const skipMigrations = true
-const dataSource = "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"
-const baseURL = "http://localhost:8080/v0/servers"
+type Config struct {
+	ExportDataPath string
+	SkipMigrations bool
+	DataSource     string
+	BaseURL        string
+	MaxMigration   int
+}
+
+// Configuration helpers
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.ParseBool(value); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
+}
+
+func loadConfig() *Config {
+	return &Config{
+		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_servers.json"),
+		SkipMigrations: getEnvBool("SKIP_MIGRATIONS", true),
+		DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
+		BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),
+		MaxMigration:   getEnvInt("MAX_MIGRATION", 7),
+	}
+}
 
 //const baseURL = "https://registry.modelcontextprotocol.io/v0/servers"
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	config := loadConfig()
+
 	// Database connection
-	db, err := sql.Open("postgres", dataSource)
+	db, err := sql.Open("postgres", config.DataSource)
 
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatal().Msgf("failed to connect to database: %v", err)
 	}
 
 	defer func(db *sql.DB) {
 		err := db.Close()
 		if err != nil {
-			log.Fatal("Failed to close database:", err)
+			log.Fatal().Msgf("Failed to close database: %v", err)
 		}
 	}(db)
 
 	var maxMigration = 0
 	// Run migrations up to a specific point (configure as needed)
-	if !(skipMigrations) {
+	if !(config.SkipMigrations) {
 		maxMigration = migrate(db)
 	}
 
 	err = importer(db)
 
 	if err != nil {
-		log.Fatal("failed to import production server data:", err)
+		log.Fatal().Msgf("failed to import production server data: %v", err)
 	}
 
 	verify(db, maxMigration)
@@ -63,10 +104,10 @@ func verify(db *sql.DB, maxMigration int) {
 	if err != nil {
 		return
 	}
-	fmt.Printf("\nTotal servers in database: %d\n", count)
+	log.Info().Msgf("\nTotal servers in database: %d\n", count)
 
 	// Check for NULL status values in the JSON
-	fmt.Println("\nAnalyzing status field in JSON data...")
+	log.Info().Msg("\nAnalyzing status field in JSON data...")
 
 	rows, err := db.Query(`
 		SELECT
@@ -80,12 +121,12 @@ func verify(db *sql.DB, maxMigration int) {
 		FROM servers
 	`)
 	if err != nil {
-		log.Fatal("Failed to analyze data:", err)
+		log.Fatal().Msgf("failed to analyze data: %v", err)
 	}
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
 		if err != nil {
-			log.Fatal("Failed to close rows:", err)
+			log.Fatal().Msgf("Failed to close rows: %v", err)
 		}
 	}(rows)
 
@@ -118,7 +159,7 @@ func verify(db *sql.DB, maxMigration int) {
 		defer func(rows *sql.Rows) {
 			err := rows.Close()
 			if err != nil {
-				log.Fatal("Failed to close rows:", err)
+				log.Fatal().Msgf("failed to close rows:%v", err)
 			}
 		}(rows)
 		for rows.Next() {
@@ -127,7 +168,7 @@ func verify(db *sql.DB, maxMigration int) {
 			if err != nil {
 				return
 			}
-			fmt.Printf("  - %s@%s\n", name, version)
+			log.Info().Msgf("  - %s@%s\n", name, version)
 		}
 	}
 
@@ -135,10 +176,22 @@ func verify(db *sql.DB, maxMigration int) {
 }
 
 func importer(db *sql.DB) error {
-	// Load production data
-	fmt.Println("\nLoading production data...")
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 
-	data, err := os.ReadFile(exportData)
+	config := loadConfig()
+
+	// Load production data
+	log.Info().Msg("\nLoading production data...")
+
+	data, err := os.ReadFile(config.ExportDataPath)
 
 	if err != nil {
 		log.Printf("failed to read export file: %v", err)
@@ -150,27 +203,26 @@ func importer(db *sql.DB) error {
 	}
 
 	if err := json.Unmarshal(data, &prodData); err != nil {
-		log.Printf("failed to parse export file: %v", err)
+		log.Info().Msgf("failed to parse export file: %v", err)
 		return err
 	}
 
-	fmt.Printf("Loading %d servers...\n", len(prodData.Servers))
+	log.Info().Msgf("Loading %d servers...\n", len(prodData.Servers))
 
 	// Prepare insert statement
-	stmt, err := db.Prepare("INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
+	stmt, err := tx.Prepare("INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
 
 	if err != nil {
-		log.Fatal("Failed to prepare statement:", err)
+		log.Fatal().Msgf("failed to prepare statement: %v", err)
 		return err
 	}
 
 	defer func(stmt *sql.Stmt) {
 		err := stmt.Close()
 		if err != nil {
-			log.Printf("failed to close statement: %v", err)
+			log.Info().Msgf("failed to close statement: %v", err)
 		}
 	}(stmt)
-
 	// Insert each server
 	for i, server := range prodData.Servers {
 
@@ -178,21 +230,34 @@ func importer(db *sql.DB) error {
 		versionID := uuid.New().String()
 
 		var rawText map[string]interface{}
-
-		err := json.Unmarshal(server, &rawText)
-		if err != nil {
-			return err
+		if err := json.Unmarshal(server, &rawText); err != nil {
+			log.Printf("Failed to unmarshal server %d: %v", i, err)
+			continue
 		}
 
-		parsed := rawText["server"].(map[string]interface{})
+		parsed, err := safeMapFromMap(rawText, "server")
+		if err != nil {
+			log.Info().Msgf("Invalid server structure at index %d: %v", i, err)
+			continue
+		}
+
 		value, err := json.Marshal(parsed)
 
 		if err != nil {
 			return err
 		}
 
-		serverName := parsed["name"].(string)
-		version := parsed["version"].(string)
+		serverName, err := safeStringFromMap(parsed, "name")
+		if err != nil {
+			log.Info().Msgf("Missing server name at index %d: %v", i, err)
+			continue
+		}
+
+		version, err := safeStringFromMap(parsed, "version")
+		if err != nil {
+			log.Info().Msgf("Missing server version at index %d: %v", i, err)
+			continue
+		}
 
 		meta := rawText["_meta"].(map[string]interface{})
 		mcp := meta["io.modelcontextprotocol.registry/official"].(map[string]interface{})
@@ -201,32 +266,38 @@ func importer(db *sql.DB) error {
 		updatedAt := mcp["updatedAt"]
 		isLatest := mcp["isLatest"]
 
-		if checkExists(serverName, version) {
-			log.Println("Skipping duplicate server version:", serverName, version)
+		exists, err := checkExistsInDB(db, serverName, version)
+		if err != nil {
+			log.Info().Msgf("Failed to check if server exists at index %d: %v", i, err)
+			continue
+		}
+
+		if exists {
+			log.Info().Msgf("skipping duplicate server %s version: %s", serverName, version)
 		} else {
 			// The server data is already JSON, just insert it
-			//log.Printf("versionID %s, serverName %s , publishedAt %s, updatedAt %s, isLatest %s, value %s", versionID, serverName, publishedAt, updatedAt, isLatest, value)
 			_, err := stmt.Exec(versionID, serverName, publishedAt, updatedAt, isLatest, value)
 
 			if err != nil {
-				log.Printf("Failed to insert server %d: %v", i, err)
+				log.Info().Msgf("Failed to insert server %d: %v", i, err)
 				continue
 			}
 
-			log.Printf("Inserted server %d: %v", i, serverName)
+			log.Info().Msgf("Inserted server %d: %v", i, serverName)
 		}
 
 	}
-
-	fmt.Println("Data loaded successfully!")
-	return nil
+	log.Info().Msg("Data loaded successfully!")
+	return tx.Commit()
 }
 
 func checkExists(serverName string, version string) bool {
 
+	config := loadConfig()
+
 	//example
 	//https://registry.modelcontextprotocol.io/v0/servers?search=ai.aliengiraffe/spotdb&version=0.1.0
-	req, err := http.NewRequest("GET", baseURL, nil)
+	req, err := http.NewRequest("GET", config.BaseURL, nil)
 	if err != nil {
 		return false
 	}
@@ -245,7 +316,7 @@ func checkExists(serverName string, version string) bool {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Printf("Failed to close body: %v", err)
+			log.Info().Msgf("Failed to close body: %v", err)
 		}
 	}(resp.Body)
 
@@ -255,12 +326,12 @@ func checkExists(serverName string, version string) bool {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Failed to read body: %v", err)
+		log.Fatal().Msgf("Failed to read body: %v", err)
 	}
 	var serverResp map[string]interface{}
 
 	if err := json.Unmarshal(body, &serverResp); err != nil {
-		log.Fatalf("Failed to parse JSON: %v", err)
+		log.Fatal().Msgf("Failed to parse JSON: %v", err)
 	}
 
 	//if it's found more than no servers it does exist
@@ -274,7 +345,7 @@ func checkExists(serverName string, version string) bool {
 func migrate(db *sql.DB) int {
 	maxMigration := 7 // Change this to test different migration states
 
-	fmt.Printf("Running migrations 001-%03d...\n", maxMigration)
+	log.Info().Msgf("Running migrations 001-%03d...\n", maxMigration)
 
 	migrationsDir := "internal/database/migrations"
 	for i := 1; i <= maxMigration; i++ {
@@ -282,18 +353,52 @@ func migrate(db *sql.DB) int {
 		files, err := filepath.Glob(migrationFile)
 
 		if err != nil || len(files) == 0 {
-			log.Fatalf("Migration file %d not found", i)
+			log.Fatal().Msgf("Migration file %d not found", i)
 		}
 
 		content, err := os.ReadFile(files[0])
 		if err != nil {
-			log.Fatalf("Failed to read migration %d: %v", i, err)
+			log.Fatal().Msgf("Failed to read migration %d: %v", i, err)
 		}
 
 		fmt.Printf("  Applying migration %d: %s\n", i, filepath.Base(files[0]))
 		if _, err := db.Exec(string(content)); err != nil {
-			log.Fatalf("Failed to apply migration %d: %v", i, err)
+			log.Fatal().Msgf("Failed to apply migration %d: %v", i, err)
 		}
 	}
 	return maxMigration
+}
+
+func safeStringFromMap(m map[string]interface{}, key string) (string, error) {
+	val, exists := m[key]
+	if !exists {
+		return "", fmt.Errorf("key %s not found", key)
+	}
+	str, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("key %s is not a string", key)
+	}
+	return str, nil
+}
+
+func safeMapFromMap(m map[string]interface{}, key string) (map[string]interface{}, error) {
+	val, exists := m[key]
+	if !exists {
+		return nil, fmt.Errorf("key %s not found", key)
+	}
+	mapVal, ok := val.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("key %s is not a map", key)
+	}
+	return mapVal, nil
+}
+
+func checkExistsInDB(db *sql.DB, serverName, version string) (bool, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM servers WHERE server_name = $1 AND value->>'version' = $2",
+		serverName, version).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
