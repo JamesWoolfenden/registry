@@ -20,7 +20,8 @@ By the end of this tutorial, you'll have:
 
 ### Step 1: Create Workflow File
 
-Create `.github/workflows/publish-mcp.yml`. Here's an example for NPM-based packages, but the MCP registry publishing steps are the same for all package types:
+Create `.github/workflows/publish-mcp.yml`. Here's an example for NPM-based packages, but the MCP registry publishing
+steps are the same for all package types:
 
 ```yaml
 name: Publish to MCP Registry
@@ -74,7 +75,8 @@ jobs:
 
 You don't need any secrets for publishing to the MCP Registry using GitHub OIDC.
 
-However you might need to add secrets for your package registry. For example the workflow above needs a `NPM_TOKEN` (which you can add in Settings → Secrets and variables → Actions).
+However you might need to add secrets for your package registry. For example the workflow above needs a `NPM_TOKEN` 
+(which you can add in Settings → Secrets and variables → Actions).
 
 ### Step 3: Tag and Release
 

@@ -146,7 +146,8 @@ Pre-requisites:
 
 ## Database Backups
 
-The deployment uses [K8up](https://k8up.io/) (a Kubernetes backup operator) that uses [Restic](https://restic.net/) under the hood.
+The deployment uses [K8up](https://k8up.io/) (a Kubernetes backup operator) that uses [Restic](https://restic.net/)
+under the hood.
 
 When running locally they are stored in a Minio bucket. In staging and production, backups are stored in a GCS bucket.
 
@@ -159,7 +160,8 @@ When running locally they are stored in a Minio bucket. In staging and productio
 kubectl port-forward -n minio svc/minio 9000:9000 9001:9001
 ```
 
-Then open [localhost:9001](http://localhost:9001), login with username `minioadmin` and password `minioadmin`, and navigate to the k8up-backups bucket.
+Then open [localhost:9001](http://localhost:9001), login with username `minioadmin` and password `minioadmin`, and navigate to the 
+k8up-backups bucket.
 
 ##### Staging and Production (GCS)
 
@@ -175,7 +177,7 @@ Backups are encrypted using Restic. To access the backup data:
    # Local (MinIO) - ensure port-forward is active: kubectl port-forward -n minio svc/minio 9000:9000 9001:9001
    AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin \
      aws --endpoint-url http://localhost:9000 s3 sync s3://k8up-backups/ ./backup-files/
-   
+
    # GCS (staging/production)
    gsutil -m cp -r gs://mcp-registry-{staging|prod}-backups/* ./backup-files/
    ```
@@ -221,6 +223,6 @@ kubectl logs -l app=postgres
 
 ### Check Backup Status
 ```bash
-kubectl describe schedule.k8up.io 
+kubectl describe schedule.k8up.io
 kubectl get backup
 ```

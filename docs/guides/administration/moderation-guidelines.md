@@ -6,19 +6,23 @@ Guidelines for server publishers on the Official MCP Registry.
 
 We're quite permissive! We only remove illegal content, malware, spam and completely broken servers.
 
-We don't make guarantees about our moderation, and subregistries should take our data "as is", assuming minimal to no moderation.
+We don't make guarantees about our moderation, and sub-registries should take our data "as is", assuming minimal to no moderation.
 
 ## Scope
 
-These guidelines apply to the **Official MCP Registry** at `registry.modelcontextprotocol.io`. 
+These guidelines apply to the **Official MCP Registry** at `registry.modelcontextprotocol.io`.
 
-Subregistries may have their own moderation policies. If you have questions about content on a specific subregistry, please contact them directly.
+Sub-registries may have their own moderation policies. If you have questions about content on a specific sub-registry,
+please contact them directly.
 
 ## Disclaimer
 
-We have limited active moderation capabilities, and this is a community supported projects. We largely rely on upstream package registries (like NPM, PyPi, and Docker) or downstream subregistries (like the GitHub MCP Registry) to do more in-depth moderation.
+We have limited active moderation capabilities, and this is a community supported projects. We largely rely on upstream
+package registries (like NPM, PyPi, and Docker) or downstream sub-registries (like the GitHub MCP Registry) to do more
+in-depth moderation.
 
-This means there may be content in the registry that should be removed under these guidelines, which we haven't yet removed. You should treat registry data accordingly.
+This means there may be content in the registry that should be removed under these guidelines, which we haven't yet
+removed. You should treat registry data accordingly.
 
 ## What We Remove
 
@@ -34,7 +38,8 @@ We'll remove servers that contain:
 
 ## What We Don't Remove
 
-Generally, we believe in keeping the registry open and pushing moderation to subregistries. We therefore **won't** remove servers that are:
+Generally, we believe in keeping the registry open and pushing moderation to sub-registries. We therefore **won't**
+remove servers that are:
 
 - Low quality or buggy servers
 - Servers with security vulnerabilities
@@ -46,7 +51,7 @@ Generally, we believe in keeping the registry open and pushing moderation to sub
 When we remove a server:
 
 - It's set to "deleted" status but remains accessible via the API
-- This allows subregistries to remove it from their indexes
+- This allows sub-registries to remove it from their indexes
 - In extreme cases, we may overwrite or erase details of a server, e.g. where the metadata itself is unlawful
 
 ## Appeals

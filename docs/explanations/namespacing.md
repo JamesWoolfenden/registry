@@ -1,6 +1,7 @@
 # Namespacing and Security
 
-Namespacing prevents name squatting, makes impersonation and typo squatting much harder, and provides attribution through domain-based identity.
+Namespacing prevents name squatting, makes impersonation and typo squatting much harder, and provides attribution 
+through domain-based identity.
 
 For practical steps on how to authenticate for different namespaces, see the [publishing guide](../guides/publishing/publish-server.md#authenticate).
 
@@ -41,5 +42,6 @@ Different authentication methods grant different namespace access:
 
 ## Limitations
 
-**Domain ownership changes**: If someone loses/sells a domain, they lose publishing rights. Similarly if someone gains a domain, they gain publishing rights.
+**Domain ownership changes**: If someone loses/sells a domain, they lose publishing rights. Similarly, if someone 
+gains a domain, they gain publishing rights.
 **Package validation**: Registry validates namespace ownership, but actual packages may still be malicious etc.

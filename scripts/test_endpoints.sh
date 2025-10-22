@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e 
+set -e
 
 echo "=================================================="
 echo "MCP Registry Endpoint Test Script"
@@ -60,13 +60,13 @@ fi
 # Test health endpoint
 test_health() {
   echo "Testing health endpoint: $HOST/v0/health"
-  
+
   # Get response and status code
   http_response=$(curl -s "$HOST/v0/health")
   status_code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST/v0/health")
-  
+
   echo "Status Code: $status_code"
-  
+
   if [[ $status_code == 2* ]]; then
     # Parse JSON response with jq
     echo "Response:"
@@ -86,26 +86,26 @@ test_health() {
 # Test servers endpoint
 test_servers() {
   echo "Testing servers endpoint: $HOST/v0/servers"
-  
+
   # Get response and status code
   http_response=$(curl -s "$HOST/v0/servers")
   status_code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST/v0/servers")
-  
+
   echo "Status Code: $status_code"
-  
+
   if [[ $status_code == 2* ]]; then
     # Parse and display JSON with jq
     echo "Response Summary:"
     echo "$http_response" | jq '.servers | length' | xargs echo "Total registries:"
-    
+
     # Display a prettier formatted summary
     echo "Server Names:"
     echo "$http_response" | jq -r '.servers[].server.name'
-    
+
     # Show the metadata with next cursor if available
     echo -e "\nPagination Metadata:"
     echo "$http_response" | jq '.metadata'
-    
+
     # Show more detailed output with all fields
     echo -e "\nServer Details:"
     echo "$http_response" | jq '.'
@@ -126,13 +126,13 @@ test_servers() {
 test_servers_with_limit() {
   limit=$1
   echo "Testing servers endpoint with limit: $HOST/v0/servers?limit=$limit"
-  
+
   # Get response and status code
   http_response=$(curl -s "$HOST/v0/servers?limit=$limit")
   status_code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST/v0/servers?limit=$limit")
-  
+
   echo "Status Code: $status_code"
-  
+
   if [[ $status_code == 2* ]]; then
     # Verify the response contains the right number of items (or not more than the limit)
     item_count=$(echo "$http_response" | jq '.servers | length')
@@ -150,11 +150,11 @@ test_servers_with_limit() {
     # Display a prettier formatted summary
     echo "Server Names:"
     echo "$http_response" | jq -r '.servers[].server.name'
-    
+
     # Show the metadata with next cursor if available
     echo -e "\nPagination Metadata:"
     echo "$http_response" | jq '.metadata'
-    
+
     # Show more detailed output with all fields
     echo -e "\nServer Details:"
     echo "$http_response" | jq '.'
@@ -174,13 +174,13 @@ test_servers_with_limit() {
 # Test ping endpoint
 test_ping() {
   echo "Testing ping endpoint: $HOST/v0/ping"
-  
+
   # Get response and status code
   http_response=$(curl -s "$HOST/v0/ping")
   status_code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST/v0/ping")
-  
+
   echo "Status Code: $status_code"
-  
+
   if [[ $status_code == 2* ]]; then
     # Parse JSON response with jq
     echo "Response:"

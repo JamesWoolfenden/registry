@@ -671,4 +671,3 @@ For MCP servers that follow a custom installation path or are embedded in applic
   "version": "0.1.0"
 }
 ```
-

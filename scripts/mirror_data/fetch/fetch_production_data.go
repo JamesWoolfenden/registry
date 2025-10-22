@@ -6,17 +6,25 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-const exportData = "scripts/mirror_data/fetch/production_servers.json"
-const baseURL = "https://registry.modelcontextprotocol.io/v0/servers"
+const (
+	exportData = "scripts/mirror_data/fetch/production_servers.json"
+	baseURL    = "https://registry.modelcontextprotocol.io/v0/servers"
+	timeout    = 30 * time.Second
+	rateLimit  = 100 * time.Millisecond
+)
 
 type ServerResponse struct {
 	Servers  []json.RawMessage `json:"servers"`
@@ -26,73 +34,128 @@ type ServerResponse struct {
 	} `json:"metadata"`
 }
 
-func main() {
+type Fetcher struct {
+	client  *http.Client
+	baseURL string
+}
 
+func NewFetcher() *Fetcher {
+	return &Fetcher{
+		client: &http.Client{
+			Timeout: timeout,
+		},
+		baseURL: baseURL,
+	}
+}
+
+func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	fetcher := NewFetcher()
+
+	ctx := context.Background()
+	allServers, err := fetcher.fetchAll(ctx)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to fetch servers")
+	}
+
+	if err := saveToFile(allServers, exportData); err != nil {
+		log.Fatal().Err(err).Msg("Failed to save data")
+	}
+
+	log.Info().Msgf("Successfully saved %d servers to %s", len(allServers), exportData)
+}
+
+func (f *Fetcher) fetchAll(ctx context.Context) ([]json.RawMessage, error) {
 	var allServers []json.RawMessage
 	cursor := ""
 	pageCount := 0
 
 	for {
 		pageCount++
-		url := baseURL
 
-		if cursor != "" {
-			url = fmt.Sprintf("%s?cursor=%s", baseURL, cursor)
-		}
-
-		fmt.Printf("Fetching page %d: %s\n", pageCount, url)
-
-		resp, err := http.Get(url)
-
+		servers, nextCursor, err := f.fetchPage(ctx, cursor, pageCount)
 		if err != nil {
-			log.Fatalf("Failed to fetch: %v", err)
+			return nil, fmt.Errorf("failed to fetch page %d: %w", pageCount, err)
 		}
 
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.Printf("Failed to close body: %v", err)
-			}
-		}(resp.Body)
+		allServers = append(allServers, servers...)
+		log.Info().Msgf("Page %d: got %d servers (total: %d)", pageCount, len(servers), len(allServers))
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalf("Failed to read body: %v", err)
-		}
-
-		var serverResp ServerResponse
-
-		if err := json.Unmarshal(body, &serverResp); err != nil {
-			log.Fatalf("Failed to parse JSON: %v", err)
-		}
-
-		allServers = append(allServers, serverResp.Servers...)
-		fmt.Printf("  Got %d servers (total: %d)\n", len(serverResp.Servers), len(allServers))
-
-		if serverResp.Metadata.NextCursor == "" {
+		if nextCursor == "" {
 			break
 		}
-		cursor = serverResp.Metadata.NextCursor
+		cursor = nextCursor
 
-		// Be nice to the API
-		time.Sleep(100 * time.Millisecond)
+		// Rate limiting
+		select {
+		case <-time.After(rateLimit):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
-	// Save all servers to a file
+	return allServers, nil
+}
+
+func (f *Fetcher) fetchPage(ctx context.Context, cursor string, pageNum int) ([]json.RawMessage, string, error) {
+	requestURL := f.baseURL
+	if cursor != "" {
+		requestURL = fmt.Sprintf("%s?cursor=%s", f.baseURL, url.QueryEscape(cursor))
+	}
+
+	log.Info().Msgf("Fetching page %d: %s", pageNum, requestURL)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := f.client.Do(req)
+
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("Failed to close response body")
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var serverResp ServerResponse
+	if err := json.Unmarshal(body, &serverResp); err != nil {
+		return nil, "", fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	return serverResp.Servers, serverResp.Metadata.NextCursor, nil
+}
+
+func saveToFile(servers []json.RawMessage, filename string) error {
 	output := map[string]interface{}{
-		"servers": allServers,
-		"count":   len(allServers),
+		"servers": servers,
+		"count":   len(servers),
 		"fetched": time.Now().Format(time.RFC3339),
 	}
 
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		log.Fatalf("Failed to marshal output: %v", err)
+		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	if err := os.WriteFile(exportData, data, 0644); err != nil {
-		log.Fatalf("Failed to write file: %v", err)
+	// #nosec G306
+	if err := os.WriteFile(filename, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
 
-	fmt.Printf("\nDone! Saved %d servers to %s\n", len(allServers), exportData)
+	return nil
 }
