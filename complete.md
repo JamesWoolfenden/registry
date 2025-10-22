@@ -1622,6 +1622,7 @@ openssl dgst -sha256 server.mcpb
 ```
 
 ### Example server.json
+
 ```json
 {
   "name": "io.github.username/server-name",

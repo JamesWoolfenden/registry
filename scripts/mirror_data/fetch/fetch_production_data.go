@@ -35,7 +35,7 @@ func main() {
 	for {
 		pageCount++
 		url := baseURL
-		
+
 		if cursor != "" {
 			url = fmt.Sprintf("%s?cursor=%s", baseURL, cursor)
 		}
@@ -43,11 +43,11 @@ func main() {
 		fmt.Printf("Fetching page %d: %s\n", pageCount, url)
 
 		resp, err := http.Get(url)
-		
+
 		if err != nil {
 			panic(fmt.Sprintf("Failed to fetch: %v", err))
 		}
-		
+
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
@@ -61,7 +61,7 @@ func main() {
 		}
 
 		var serverResp ServerResponse
-		
+
 		if err := json.Unmarshal(body, &serverResp); err != nil {
 			log.Fatalf("Failed to parse JSON: %v", err)
 		}
@@ -89,7 +89,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to marshal output: %v", err)
 	}
-	
+
 	if err := os.WriteFile(exportData, data, 0644); err != nil {
 		log.Fatalf("Failed to write file: %v", err)
 	}

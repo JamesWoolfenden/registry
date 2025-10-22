@@ -57,7 +57,7 @@ func verify(db *sql.DB, maxMigration int) {
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&count)
 	if err != nil {
-		return 
+		return
 	}
 	fmt.Printf("\nTotal servers in database: %d\n", count)
 
@@ -89,7 +89,7 @@ func verify(db *sql.DB, maxMigration int) {
 		var total, nullStatus, emptyStatus, stringNullStatus, activeStatus, deprecatedStatus, deletedStatus int
 		err := rows.Scan(&total, &nullStatus, &emptyStatus, &stringNullStatus, &activeStatus, &deprecatedStatus, &deletedStatus)
 		if err != nil {
-			return 
+			return
 		}
 
 		fmt.Printf("  Total servers: %d\n", total)
@@ -121,7 +121,7 @@ func verify(db *sql.DB, maxMigration int) {
 			var name, version string
 			err := rows.Scan(&name, &version)
 			if err != nil {
-				return 
+				return
 			}
 			fmt.Printf("  - %s@%s\n", name, version)
 		}
@@ -154,12 +154,12 @@ func importer(db *sql.DB) error {
 
 	// Prepare insert statement
 	stmt, err := db.Prepare("INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
-	
+
 	if err != nil {
 		log.Fatal("Failed to prepare statement:", err)
 		return err
 	}
-	
+
 	defer func(stmt *sql.Stmt) {
 		err := stmt.Close()
 		if err != nil {
@@ -184,7 +184,7 @@ func importer(db *sql.DB) error {
 
 		meta := rawText["_meta"].(map[string]interface{})
 		mcp:= meta["io.modelcontextprotocol.registry/official"].(map[string]interface{})
-		
+
 		publishedAt := mcp["publishedAt"]
 		updatedAt := mcp["updatedAt"]
 		isLatest := mcp["isLatest"]

@@ -10,7 +10,7 @@ CLI tool for publishing MCP servers to the registry.
 # Build the tool
 make publisher
 
-# Test locally 
+# Test locally
 make dev-compose  # Start local registry
 ./bin/mcp-publisher init
 ./bin/mcp-publisher login none --registry=http://localhost:8080
@@ -21,7 +21,7 @@ make dev-compose  # Start local registry
 
 ### Commands
 - **`init`** - Generate server.json templates with auto-detection
-- **`login`** - Handle authentication (github, dns, http, none)  
+- **`login`** - Handle authentication (github, dns, http, none)
 - **`publish`** - Validate and upload servers to registry
 - **`logout`** - Clear stored credentials
 

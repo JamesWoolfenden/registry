@@ -9,7 +9,7 @@ The MCP registry provides MCP clients with a list of MCP servers, like an app st
 **2025-09-08 update**: The registry has launched in preview 🎉 ([announcement blog post](https://blog.modelcontextprotocol.io/posts/2025-09-08-mcp-registry-preview/)). While the system is now more stable, this is still a preview release and breaking changes or data resets may occur. A general availability (GA) release will follow later. We'd love your feedback in [GitHub discussions](https://github.com/modelcontextprotocol/registry/discussions/new?category=ideas) or in the [#registry-dev Discord](https://discord.com/channels/1358869848138059966/1369487942862504016) ([joining details here](https://modelcontextprotocol.io/community/communication)).
 
 Current key maintainers:
-- **Adam Jones** (Anthropic) [@domdomegg](https://github.com/domdomegg)  
+- **Adam Jones** (Anthropic) [@domdomegg](https://github.com/domdomegg)
 - **Tadas Antanavicius** (PulseMCP) [@tadasant](https://github.com/tadasant)
 - **Toby Padilla** (GitHub) [@toby](https://github.com/toby)
 - **Radoslav (Rado) Dimitrov** (Stacklok) [@rdimitrov](https://github.com/rdimitrov)
@@ -22,7 +22,7 @@ Often (but not always) ideas flow through this pipeline:
 
 - **[Discord](https://modelcontextprotocol.io/community/communication)** - Real-time community discussions
 - **[Discussions](https://github.com/modelcontextprotocol/registry/discussions)** - Propose and discuss product/technical requirements
-- **[Issues](https://github.com/modelcontextprotocol/registry/issues)** - Track well-scoped technical work  
+- **[Issues](https://github.com/modelcontextprotocol/registry/issues)** - Track well-scoped technical work
 - **[Pull Requests](https://github.com/modelcontextprotocol/registry/pulls)** - Contribute work towards issues
 
 ### Quick start:
@@ -30,7 +30,7 @@ Often (but not always) ideas flow through this pipeline:
 #### Pre-requisites
 
 - **Docker**
-- **Go 1.24.x** 
+- **Go 1.24.x**
 - **golangci-lint v2.4.0**
 
 #### Running the server
@@ -40,11 +40,16 @@ Often (but not always) ideas flow through this pipeline:
 make dev-compose
 ```
 
-This starts the registry at [`localhost:8080`](http://localhost:8080) with PostgreSQL. The database uses ephemeral storage and is reset each time you restart the containers, ensuring a clean state for development and testing.
+This starts the registry at [`localhost:8080`](http://localhost:8080) with PostgreSQL. The database uses ephemeral storage and is reset 
+each time you restart the containers, ensuring a clean state for development and testing.
 
-By default, the registry seeds from the production API with a filtered subset of servers (to keep startup fast). This ensures your local environment mirrors production behavior and all seed data passes validation. For offline development you can seed from a file without validation with `MCP_REGISTRY_SEED_FROM=data/seed.json MCP_REGISTRY_ENABLE_REGISTRY_VALIDATION=false make dev-compose`.
+By default, the registry seeds from the production API with a filtered subset of servers (to keep startup fast). This 
+ensures your local environment mirrors production behavior and all seed data passes validation. For offline development
+you can seed from a file without validation with
+`MCP_REGISTRY_SEED_FROM=data/seed.json MCP_REGISTRY_ENABLE_REGISTRY_VALIDATION=false make dev-compose`.
 
-The setup can be configured with environment variables in [docker-compose.yml](./docker-compose.yml) - see [.env.example](./.env.example) for a reference.
+The setup can be configured with environment variables in [docker-compose.yml](./docker-compose.yml) - see [.env.example](./.env.example) for a 
+reference.
 
 <details>
 <summary>Alternative: Running a pre-built Docker image</summary>
@@ -65,7 +70,7 @@ docker run -p 8080:8080 ghcr.io/modelcontextprotocol/registry:v1.0.0
 docker run -p 8080:8080 ghcr.io/modelcontextprotocol/registry:main-20250906-abc123d
 ```
 
-**Available tags:** 
+**Available tags:**
 - **Releases**: `latest`, `v1.0.0`, `v1.1.0`, etc.
 - **Continuous**: `main` (latest main branch build)
 - **Development**: `main-<date>-<sha>` (specific commit builds)

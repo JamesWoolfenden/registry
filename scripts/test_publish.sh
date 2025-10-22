@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e 
+set -e
 
 echo "=================================================="
 echo "MCP Registry Publish Endpoint Test Script"
@@ -168,23 +168,23 @@ if [[ "${status_code:0:1}" == "2" ]]; then
   # Parse JSON response with jq
   echo "Response:"
   echo "$http_response" | jq '.' 2>/dev/null || echo "$http_response"
-  
+
   # Check for server added message and extract server name
   message=$(echo "$http_response" | jq -r '.message // empty' 2>/dev/null)
   server_name=$(echo "$http_response" | jq -r '.server.name // .name // empty' 2>/dev/null)
-  
+
   # Validate the response contains success indicators
   success_indicators=0
-  
-  if [[ ! -z "$message" && "$message" != "null" ]]; then
+
+  if [[ -n "$message" && "$message" != "null" ]]; then
     echo "✓ Success message received: $message"
     if [[ "$message" == *"server"* && ("$message" == *"added"* || "$message" == *"published"* || "$message" == *"created"*) ]]; then
       ((success_indicators++))
       echo "✓ Message indicates server was successfully added"
     fi
   fi
-  
-  if [[ ! -z "$server_name" && "$server_name" != "null" && "$server_name" != "empty" ]]; then
+
+  if [[ -n "$server_name" && "$server_name" != "null" && "$server_name" != "empty" ]]; then
     echo "✓ Server name received: $server_name"
     # Validate server name format (should contain a namespace like 'domain/name')
     if [[ "$server_name" == *"/"* ]]; then
@@ -195,7 +195,7 @@ if [[ "${status_code:0:1}" == "2" ]]; then
       ((success_indicators++)) # Still count as success if we got a name
     fi
   fi
-  
+
   if [[ $success_indicators -ge 2 ]]; then
     echo ""
     echo "🎉 PUBLISH TEST PASSED!"
@@ -208,7 +208,7 @@ if [[ "${status_code:0:1}" == "2" ]]; then
     echo "   Received: message='$message', name='$server_name'"
     exit 1
   fi
-  
+
 else
   echo ""
   echo "❌ PUBLISH TEST FAILED!"

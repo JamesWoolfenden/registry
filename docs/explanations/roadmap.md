@@ -1,12 +1,15 @@
 # MCP Registry Roadmap
 
-This is a high-level roadmap for the MCP Registry. It is subject to change and not exhaustive, but it outlines the general thinking of the sequencing and scope of our work in this repository.
+This is a high-level roadmap for the MCP Registry. It is subject to change and not exhaustive, but it outlines the
+general thinking of the sequencing and scope of our work in this repository.
 
-This roadmap may occasionally drift out of date. Please review [Issues](https://github.com/modelcontextprotocol/registry/issues) (and corresponding Labels) for the most current work in progress.
+This roadmap may occasionally drift out of date. Please review [Issues](https://github.com/modelcontextprotocol/registry/issues) (and corresponding Labels) for the most
+current work in progress.
 
 ## Current Status
 
-The initial version of the MCP Registry is actively being developed. The initial focus is on delivering a REST API to which server creators can publish, and aggregator/marketplace consumers can ETL.
+The initial version of the MCP Registry is actively being developed. The initial focus is on delivering a REST API to
+which server creators can publish, and aggregator/marketplace consumers can ETL.
 
 ## Phase 1: MVP/Go-Live (Current Focus)
 

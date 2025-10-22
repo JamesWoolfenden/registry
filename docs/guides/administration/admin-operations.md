@@ -141,6 +141,6 @@ curl -s "https://registry.modelcontextprotocol.io/v0/servers/${ENCODED_SERVER_NA
 ## Notes
 
 - **Version-specific changes**: Only affect that particular version
-- **Server-wide changes**: Must be applied to each version individually  
+- **Server-wide changes**: Must be applied to each version individually
 - **Content scrubbing**: Use the version-specific edit workflow to scrub sensitive content
 - **Server name**: Cannot be changed in any version (it's the immutable identifier)

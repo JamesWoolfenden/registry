@@ -26,7 +26,7 @@ By the end of this tutorial, you'll have:
 You can make your MCP server available in multiple ways:
 
 - **📦 Package deployment**: Published to registries (npm, PyPI, NuGet, Docker Hub, etc.) and run locally by clients
-- **🌐 Remote deployment**: Hosted as a web service that clients connect to directly  
+- **🌐 Remote deployment**: Hosted as a web service that clients connect to directly
 - **🔄 Hybrid deployment**: Offer both package and remote options for maximum flexibility
 
 Learn more about [MCP server architecture](https://modelcontextprotocol.io/docs/learn/architecture) in the official docs.
@@ -266,7 +266,7 @@ LABEL io.modelcontextprotocol.server.name="io.github.username/server-name"
 ### How It Works
 - Registry authenticates with container registries using token-based authentication:
   - **Docker Hub**: Uses `auth.docker.io` token service
-  - **GitHub Container Registry**: Uses `ghcr.io` token service  
+  - **GitHub Container Registry**: Uses `ghcr.io` token service
 - Fetches image manifest using Docker Registry v2 API
 - Checks that `io.modelcontextprotocol.server.name` annotation matches your server name
 - Fails if annotation is missing or doesn't match
