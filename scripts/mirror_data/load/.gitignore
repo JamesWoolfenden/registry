@@ -1,2 +1,4 @@
 # Ignore downloaded production data
 production_servers.json
+load
+load.exe

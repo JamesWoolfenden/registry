@@ -1,4 +1,4 @@
 # Ignore downloaded production data
 production_servers.json
-
+fetch
 *.exe

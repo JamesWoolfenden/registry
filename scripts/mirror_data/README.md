@@ -1,9 +1,8 @@
 # Mirror Production Data
 
-> **Note:** These tools were created by Claude Code as a simple way to kick the tires on data migrations.
-> They are not intended for production use.
-
-Tools to fetch and load production registry data for local testing and migration debugging.
+The Tools to fetch and load production registry data for local testing and migration debugging, 
+and to enable sub-registries to sync up new data. It also gives us an opportunity to examine 
+and review prior to listing.
 
 ## Overview
 
@@ -11,6 +10,7 @@ These scripts help you:
 1. Fetch all server data from the production registry API
 2. Load it into a local PostgreSQL database
 3. Test migrations against real production data
+4. Analyse and score the server
 
 ## Prerequisites
 
@@ -24,6 +24,7 @@ These scripts help you:
 ## Usage
 
 ### 1. Fetch Production Data
+You can run these tools as stand-alone executables (fetch) or as a script.
 
 ```bash
 # From the project root directory
@@ -33,14 +34,19 @@ go run scripts/mirror_data/fetch_production_data.go
 This will:
 - Fetch all servers from https://registry.modelcontextprotocol.io/v0/servers
 - Handle pagination automatically
-- Save data to `scripts/mirror_data/production_servers.json`
+- Save data to `scripts/mirror_data/fetch/production_servers.json`
 - Be respectful to the API with rate limiting
 
 Output: `production_servers.json` containing all server records
 
-### 2. Set Up Test Database
+### 2. Set Up (Test) Database
 
-Start a PostgreSQL container for testing:
+You can start a PostgreSQL container for testing or connect to instance running in your local compose 
+stack, or use the docker compose stack (current preference):
+
+```bash
+make dev-compose
+```
 
 ```bash
 docker run -d --name test-postgres \
@@ -57,7 +63,16 @@ docker exec test-postgres psql -U postgres postgres -c "DROP DATABASE IF EXISTS 
 docker exec test-postgres psql -U postgres postgres -c "CREATE DATABASE registry_test;"
 ```
 
+There is also a make target in root:
+
+```bash
+make db-clean
+```
+
+
 ### 3. Load Production Data
+
+Can be run as stand-alone exec or as a script:
 
 ```bash
 # From the project root directory
