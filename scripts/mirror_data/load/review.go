@@ -31,9 +31,9 @@ func Dispatch(allCode []string, ctx context.Context, client *genai.Client, model
 		return &paloExtensions, nil
 	}
 
-	fmt.Printf("Aggregate Score: %d\n", response.Score)
-	fmt.Println("\nComment:")
-	fmt.Printf("%s\n", response.Comment)
+	log.Info().Msgf("Aggregate Score: %d\n", response.Score)
+	log.Info().Msgf("Comment:")
+	log.Info().Msgf("%s", response.Comment)
 
 	if len(response.Comment) > 5000 {
 		response.Comment = response.Comment[:5000]

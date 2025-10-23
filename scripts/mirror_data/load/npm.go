@@ -10,8 +10,8 @@ import (
 
 func ScanNpmPackages(ctx context.Context, client *genai.Client, model string, mcp Server) (*PaloMeta, error) {
 	registryURL := fmt.Sprintf("https://registry.npmjs.org/%s", mcp.Packages[0].Identifier)
+	log.Info().Str("url", registryURL).Msg("scanning package")
 
-	fmt.Println("registryURL:", registryURL)
 	AllCode, err := GetArchiveCode(registryURL)
 
 	if err != nil {

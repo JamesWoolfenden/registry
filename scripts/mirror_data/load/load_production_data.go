@@ -44,6 +44,7 @@ func main() {
 	}
 }
 
+// Usage in main transaction function
 func transaction() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -52,15 +53,13 @@ func transaction() error {
 
 	// Database connection
 	db, err := sql.Open("postgres", config.DataSource)
-
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			log.Error().Msgf("Failed to close database: %v", err)
+		if closeErr := db.Close(); closeErr != nil {
+			log.Error().Msgf("Failed to close database: %v", closeErr)
 		}
 	}(db)
 
@@ -73,8 +72,8 @@ func transaction() error {
 		}
 	}
 
+	// Use batched importer instead of single transaction
 	err = importerWithContext(ctx, db)
-
 	if err != nil {
 		return fmt.Errorf("failed to import production server data: %w", err)
 	}
@@ -192,28 +191,16 @@ func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error 
 	return nil
 }
 
-// Updated importer with context
+// Updated importer with batched transactions
 func importerWithContext(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
 	config := loadConfig()
 
 	// Load production data
 	log.Info().Msg("\nLoading production data...")
 
 	data, err := os.ReadFile(config.ExportDataPath)
-
 	if err != nil {
-		log.Printf("failed to read export file: %v", err)
-		return err
+		return fmt.Errorf("failed to read export file: %w", err)
 	}
 
 	var prodData struct {
@@ -221,122 +208,174 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 	}
 
 	if err := json.Unmarshal(data, &prodData); err != nil {
-		log.Info().Msgf("failed to parse export file: %v", err)
-		return err
+		return fmt.Errorf("failed to parse export file: %w", err)
 	}
 
-	log.Info().Msgf("Loading %d servers...\n", len(prodData.Servers))
+	log.Info().Msgf("Loading %d servers in batches of 30...\n", len(prodData.Servers))
 
-	// Prepare insert statement
+	const batchSize = 30
+	totalServers := len(prodData.Servers)
+
+	for batchStart := 0; batchStart < totalServers; batchStart += batchSize {
+		batchEnd := batchStart + batchSize
+		if batchEnd > totalServers {
+			batchEnd = totalServers
+		}
+
+		batch := prodData.Servers[batchStart:batchEnd]
+		batchNum := (batchStart / batchSize) + 1
+		totalBatches := (totalServers + batchSize - 1) / batchSize
+
+		log.Info().Msgf("Processing batch %d/%d (%d records)...", batchNum, totalBatches, len(batch))
+
+		err := processBatch(ctx, db, batch, batchStart)
+		if err != nil {
+			log.Error().Msgf("Failed to process batch %d: %v", batchNum, err)
+			// Continue with next batch instead of failing completely
+			continue
+		}
+
+		log.Info().Msgf("Successfully processed batch %d/%d", batchNum, totalBatches)
+	}
+
+	log.Info().Msg("Data loading completed!")
+	return nil
+}
+
+// Process a single batch of servers in a transaction
+func processBatch(ctx context.Context, db *sql.DB, batch []json.RawMessage, startIndex int) error {
+	// Start transaction for this batch
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin batch transaction: %w", err)
+	}
+
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				log.Error().Msgf("Failed to rollback batch transaction: %v", rbErr)
+			}
+		}
+	}()
+
+	// Prepare insert statement for this batch
 	stmt, err := tx.PrepareContext(ctx,
 		"INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value, faun) VALUES ($1, $2, $3, $4, $5, $6, $7)")
-
 	if err != nil {
-		log.Error().Msgf("failed to prepare statement: %v", err)
-		return err
+		return fmt.Errorf("failed to prepare batch statement: %w", err)
+	}
+	defer func() {
+		if closeErr := stmt.Close(); closeErr != nil {
+			log.Error().Msgf("Failed to close batch statement: %v", closeErr)
+		}
+	}()
+
+	// Process each server in the batch
+	processedCount := 0
+	skippedCount := 0
+	errorCount := 0
+
+	for i, server := range batch {
+		globalIndex := startIndex + i
+
+		err := processServerRecord(ctx, db, tx, stmt, server, globalIndex)
+		if err != nil {
+			log.Warn().Msgf("Failed to process server %d: %v", globalIndex, err)
+			errorCount++
+			continue
+		}
+		processedCount++
 	}
 
-	defer stmt.Close()
+	// Commit the batch transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit batch transaction: %w", err)
+	}
 
-	// Insert each server
-	for i, server := range prodData.Servers {
-		// Generate a unique version_id
-		//versionID := uuid.New().String()
+	log.Info().Msgf("Batch completed: %d processed, %d skipped, %d errors",
+		processedCount, skippedCount, errorCount)
 
-		var rawText map[string]interface{}
-		if err := json.Unmarshal(server, &rawText); err != nil {
-			log.Info().Msgf("Failed to unmarshal server %d: %v", i, err)
-			continue
-		}
+	return nil
+}
 
-		parsed, err := safeMapFromMap(rawText, "server")
-		if err != nil {
-			log.Info().Msgf("Invalid server structure at index %d: %v", i, err)
-			continue
-		}
+// Process a single server record
+func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.Stmt, server json.RawMessage, index int) error {
+	var rawText map[string]interface{}
+	if err := json.Unmarshal(server, &rawText); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
 
-		value, err := json.Marshal(parsed)
+	parsed, err := safeMapFromMap(rawText, "server")
+	if err != nil {
+		return fmt.Errorf("invalid server structure: %w", err)
+	}
 
-		if err != nil {
-			return err
-		}
+	value, err := json.Marshal(parsed)
+	if err != nil {
+		return fmt.Errorf("failed to marshal server data: %w", err)
+	}
 
-		serverName, err := safeStringFromMap(parsed, "name")
-		if err != nil {
-			log.Info().Msgf("Missing server name at index %d: %v", i, err)
-			continue
-		}
+	serverName, err := safeStringFromMap(parsed, "name")
+	if err != nil {
+		return fmt.Errorf("missing server name: %w", err)
+	}
 
-		version, err := safeStringFromMap(parsed, "version")
-		if err != nil {
-			log.Info().Msgf("Missing server version at index %d: %v", i, err)
-			continue
-		}
+	version, err := safeStringFromMap(parsed, "version")
+	if err != nil {
+		return fmt.Errorf("missing server version: %w", err)
+	}
 
-		meta := rawText["_meta"].(map[string]interface{})
-		mcp := meta["io.modelcontextprotocol.registry/official"].(map[string]interface{})
+	meta := rawText["_meta"].(map[string]interface{})
+	mcp := meta["io.modelcontextprotocol.registry/official"].(map[string]interface{})
 
-		publishedAt := mcp["publishedAt"]
-		updatedAt := mcp["updatedAt"]
-		isLatestNew, ok := mcp["isLatest"].(bool)
-		if !ok {
-			isLatestNew = false
-		}
+	publishedAt := mcp["publishedAt"]
+	updatedAt := mcp["updatedAt"]
+	isLatest := mcp["isLatest"]
 
-		//OldReview, ok := meta["www.paloaltonetworks.com/official"].(string)
-		//
-		//if !ok {
-		//	OldReview = ""
-		//}
+	//OldReview, ok := meta["www.paloaltonetworks.com/official"].(string)
+	//if !ok {
+	//	OldReview = ""
+	//}
 
-		exists, latestDB, err := checkExistsInDB(ctx, db, serverName, version)
-		if err != nil {
-			log.Info().Msgf("Failed to check if server exists at index %d: %v", i, err)
-			continue
-		}
+	exists, latestInDB, err := checkExistsInDB(ctx, db, serverName, version)
+	if err != nil {
+		return fmt.Errorf("failed to check if server exists: %w", err)
+	}
 
-		if exists {
-			if !(isLatestNew) && (isLatestNew != latestDB) {
-				//we need to update the value of isLatestNew and leave the review alone
-				// The server data is already JSON, just insert it
-
-				//needs to be an update SQl only
-				//update is_latest=false
-				// Only update the is_latest field
-				_, err = db.ExecContext(ctx, `
-			UPDATE servers 
-			SET is_latest = $1 
-			WHERE server_name = $2 AND value->>'version' = $3
-		`, isLatestNew, serverName, version)
-
-				if err != nil {
-					log.Info().Msgf("Failed to update is_latest for server %s@%s: %v", serverName, version, err)
-					continue
-				}
-
-				log.Info().Msgf("Updated is_latest to %v for server %s@%s", isLatestNew, serverName, version)
-
-			}
-			//need to check if it's not the latest anymore
-			log.Info().Msgf("skipping duplicate server %s version: %s", serverName, version)
-		} else {
-			paloMeta, err := review(value)
-
-			// The server data is already JSON, just insert it
-			_, err = stmt.ExecContext(ctx, version, serverName, publishedAt, updatedAt, isLatestNew, value, paloMeta)
+	if exists {
+		if latestInDB != isLatest {
+			// Update is_latest field only using the transaction
+			_, err = tx.ExecContext(ctx, `
+				UPDATE servers 
+				SET is_latest = $1, updated_at = NOW()
+				WHERE server_name = $2 AND value->>'version' = $3
+			`, isLatest, serverName, version)
 
 			if err != nil {
-				log.Info().Msgf("Failed to insert server %d: %v", i, err)
-				log.Info().Msgf("%s %s %s %s %t %s %s", version, serverName, publishedAt, updatedAt, isLatestNew, value, paloMeta)
-				continue
+				return fmt.Errorf("failed to update is_latest: %w", err)
 			}
-			log.Info().Msgf("Inserted server %d: %v", i, serverName)
+
+			log.Info().Msgf("Updated is_latest to %v for server %s@%s", isLatest, serverName, version)
 		}
 
+		log.Debug().Msgf("Skipping duplicate server %s@%s", serverName, version)
+		return nil // Not an error, just skipped
 	}
 
-	log.Info().Msg("Data loaded successfully!")
-	return tx.Commit()
+	// Generate review for new server
+	paloMeta, err := review(value)
+	if err != nil {
+		return fmt.Errorf("failed to generate review: %w", err)
+	}
+
+	// Insert new server
+	_, err = stmt.ExecContext(ctx, version, serverName, publishedAt, updatedAt, isLatest, value, paloMeta)
+	if err != nil {
+		return fmt.Errorf("failed to insert server: %w", err)
+	}
+
+	log.Info().Msgf("Inserted server %d: %s@%s", index, serverName, version)
+	return nil
 }
 
 func review(value []uint8) ([]byte, error) {
