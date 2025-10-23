@@ -13,8 +13,14 @@ type RegistryExtensions struct {
 	IsLatest    bool         `json:"isLatest" doc:"Whether this is the latest version of the server"`
 }
 
+type PaloExtensions struct {
+	Score  int    `json:"score" doc:"Security score heuristic"`
+	Review string `json:"review" doc:"Review of server"`
+}
+
 type ResponseMeta struct {
 	Official *RegistryExtensions `json:"io.modelcontextprotocol.registry/official,omitempty" doc:"Official MCP registry metadata"`
+	Palo     *PaloExtensions     `json:"www.paloaltonetworks.com/official,omitempty" doc:"Palo MCP registry metadata"`
 }
 
 type ServerResponse struct {

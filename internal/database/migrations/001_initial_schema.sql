@@ -6,25 +6,27 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
+DROP TABLE IF EXISTS servers;
+
 -- Servers table - core server information
-CREATE TABLE servers (
+CREATE TABLE IF NOT EXISTS servers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     status VARCHAR(50) DEFAULT 'active',
-    
+
     -- Repository information stored as JSONB for flexibility
     repository JSONB,
-    
+
     -- Version details
     version VARCHAR(255) NOT NULL,
     release_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     is_latest BOOLEAN DEFAULT true,
-    
+
     -- Packages and remotes stored as JSONB arrays
     packages JSONB DEFAULT '[]'::jsonb,
     remotes JSONB DEFAULT '[]'::jsonb,
-    
+
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -49,7 +51,7 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ language plpgsql;
 
 -- Trigger to automatically update updated_at
 CREATE TRIGGER update_servers_updated_at 

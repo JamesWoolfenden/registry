@@ -29,7 +29,7 @@ BEGIN
     FOR rec IN SELECT id, value FROM servers ORDER BY id LOOP
         -- Extract server name from the JSONB value
         server_name := rec.value->>'name';
-        
+
         -- Check if we already have a server_id for this server name
         IF (server_id_map ? server_name) THEN
             new_server_id := (server_id_map->>server_name)::UUID;
@@ -41,25 +41,25 @@ BEGIN
         
         -- Update the JSON metadata
         updated_meta := rec.value->'_meta'->'io.modelcontextprotocol.registry/official';
-        
+
         -- Add serverId and rename id to versionId
         updated_meta := updated_meta || jsonb_build_object(
             'serverId', new_server_id::TEXT,
             'versionId', updated_meta->>'id'
         );
-        
+
         -- Remove the old 'id' field
         updated_meta := updated_meta - 'id';
-        
+
         -- Update the full value with new metadata
         updated_value := jsonb_set(
             rec.value,
             '{_meta,io.modelcontextprotocol.registry/official}',
             updated_meta
         );
-        
+
         -- Update the record with version_id and updated JSON
-        UPDATE servers 
+        UPDATE servers
         SET 
             version_id = rec.id,
             value = updated_value

@@ -26,7 +26,7 @@ See the [interactive API documentation](https://registry.modelcontextprotocol.io
 
 **Disclaimer**: The official registry provides no uptime or data durability guarantees. You should design your applications to handle service downtime via caching.
 
-## Building a subregistry
+## Building a sub-registry
 **Create enhanced registries** - ETL official registry data and add your own metadata like ratings, security scans, or compatibility info.
 
 For now we recommend scraping the `GET /v0/servers` endpoint on some regular basis. In the future we might provide a filter for updatedAt ([#291](https://github.com/modelcontextprotocol/registry/issues/291)) to get only recently changed servers.

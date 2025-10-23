@@ -203,6 +203,10 @@ func (db *PostgreSQL) ListServers(
 					UpdatedAt:   updatedAt,
 					IsLatest:    isLatest,
 				},
+				Palo: &apiv0.PaloExtensions{
+					Score:  -999,
+					Review: "This is toast",
+				},
 			},
 		}
 

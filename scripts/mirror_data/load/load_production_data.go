@@ -6,14 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"google.golang.org/genai"
 )
 
 type Config struct {
@@ -22,6 +20,7 @@ type Config struct {
 	DataSource     string
 	BaseURL        string
 	MaxMigration   int
+	GCPProject     string
 }
 
 func loadConfig() *Config {
@@ -31,6 +30,7 @@ func loadConfig() *Config {
 		DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
 		BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),
 		MaxMigration:   getEnvInt("MAX_MIGRATION", 7),
+		GCPProject:     getEnv("GCP_PROJECT", "ocpoit"),
 	}
 }
 
@@ -87,18 +87,26 @@ func transaction() error {
 }
 
 // Updated database helpers with context
-func checkExistsInDB(ctx context.Context, db *sql.DB, serverName, version string) (bool, error) {
+func checkExistsInDB(ctx context.Context, db *sql.DB, serverName, version string) (bool, bool, error) {
 	var count int
+	var isLatest sql.NullBool
+
 	err := db.QueryRowContext(ctx, `
-		SELECT COUNT(*) 
+		SELECT 
+			COUNT(*) as count,
+			BOOL_OR(is_latest) as is_latest
 		FROM servers 
 		WHERE server_name = $1 AND value->>'version' = $2
-	`, serverName, version).Scan(&count)
+	`, serverName, version).Scan(&count, &isLatest)
 
 	if err != nil {
-		return false, fmt.Errorf("failed to check if server exists: %w", err)
+		return false, false, fmt.Errorf("failed to check if server exists: %w", err)
 	}
-	return count > 0, nil
+
+	exists := count > 0
+	latest := isLatest.Valid && isLatest.Bool
+
+	return exists, latest, nil
 }
 
 // Updated verify function with context
@@ -220,7 +228,8 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 	log.Info().Msgf("Loading %d servers...\n", len(prodData.Servers))
 
 	// Prepare insert statement
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value) VALUES ($1, $2, $3, $4, $5, $6)")
+	stmt, err := tx.PrepareContext(ctx,
+		"INSERT INTO servers (version, server_name, published_at, updated_at, is_latest, value, faun) VALUES ($1, $2, $3, $4, $5, $6, $7)")
 
 	if err != nil {
 		log.Error().Msgf("failed to prepare statement: %v", err)
@@ -232,7 +241,7 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 	// Insert each server
 	for i, server := range prodData.Servers {
 		// Generate a unique version_id
-		versionID := uuid.New().String()
+		//versionID := uuid.New().String()
 
 		var rawText map[string]interface{}
 		if err := json.Unmarshal(server, &rawText); err != nil {
@@ -269,64 +278,120 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 
 		publishedAt := mcp["publishedAt"]
 		updatedAt := mcp["updatedAt"]
-		isLatest := mcp["isLatest"]
+		isLatestNew, ok := mcp["isLatest"].(bool)
+		if !ok {
+			isLatestNew = false
+		}
 
-		exists, err := checkExistsInDB(ctx, db, serverName, version)
+		//OldReview, ok := meta["www.paloaltonetworks.com/official"].(string)
+		//
+		//if !ok {
+		//	OldReview = ""
+		//}
+
+		exists, latestDB, err := checkExistsInDB(ctx, db, serverName, version)
 		if err != nil {
 			log.Info().Msgf("Failed to check if server exists at index %d: %v", i, err)
 			continue
 		}
 
 		if exists {
+			if !(isLatestNew) && (isLatestNew != latestDB) {
+				//we need to update the value of isLatestNew and leave the review alone
+				// The server data is already JSON, just insert it
+
+				//needs to be an update SQl only
+				//update is_latest=false
+				// Only update the is_latest field
+				_, err = db.ExecContext(ctx, `
+			UPDATE servers 
+			SET is_latest = $1 
+			WHERE server_name = $2 AND value->>'version' = $3
+		`, isLatestNew, serverName, version)
+
+				if err != nil {
+					log.Info().Msgf("Failed to update is_latest for server %s@%s: %v", serverName, version, err)
+					continue
+				}
+
+				log.Info().Msgf("Updated is_latest to %v for server %s@%s", isLatestNew, serverName, version)
+
+			}
+			//need to check if it's not the latest anymore
 			log.Info().Msgf("skipping duplicate server %s version: %s", serverName, version)
 		} else {
+			paloMeta, err := review(value)
+
 			// The server data is already JSON, just insert it
-			_, err := stmt.ExecContext(ctx, versionID, serverName, publishedAt, updatedAt, isLatest, value)
+			_, err = stmt.ExecContext(ctx, version, serverName, publishedAt, updatedAt, isLatestNew, value, paloMeta)
 
 			if err != nil {
 				log.Info().Msgf("Failed to insert server %d: %v", i, err)
+				log.Info().Msgf("%s %s %s %s %t %s %s", version, serverName, publishedAt, updatedAt, isLatestNew, value, paloMeta)
 				continue
 			}
-
 			log.Info().Msgf("Inserted server %d: %v", i, serverName)
 		}
+
 	}
 
 	log.Info().Msg("Data loaded successfully!")
 	return tx.Commit()
 }
 
-// Updated migrate function with context
-func migrateWithContext(ctx context.Context, db *sql.DB) (int, error) {
-	maxMigration := 7 // Change this to test different migration states
+func review(value []uint8) ([]byte, error) {
+	const model = "gemini-2.5-flash"
+	config := loadConfig()
 
-	log.Info().Msgf("Running migrations 001-%03d...\n", maxMigration)
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		Project:  config.GCPProject,
+		Location: "us-central1",
+		Backend:  genai.BackendVertexAI,
+	})
 
-	migrationsDir := "internal/database/migrations"
-	for i := 1; i <= maxMigration; i++ {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return i - 1, ctx.Err()
-		default:
-		}
+	var paloMeta *PaloMeta
 
-		migrationFile := filepath.Join(migrationsDir, fmt.Sprintf("%03d_*.sql", i))
-		files, err := filepath.Glob(migrationFile)
+	var mcp Server
 
-		if err != nil || len(files) == 0 {
-			return i - 1, fmt.Errorf("migration file %d not found", i)
-		}
+	if err := json.Unmarshal(value, &mcp); err != nil {
+		return nil, err
+	}
 
-		content, err := os.ReadFile(files[0])
-		if err != nil {
-			return i - 1, fmt.Errorf("failed to read migration %d: %w", i, err)
-		}
+	if len(mcp.Packages) > 0 {
+		first := mcp.Packages[0]
+		switch first.RegistryType {
 
-		log.Info().Msgf("  Applying migration %d: %s\n", i, filepath.Base(files[0]))
-		if _, err := db.ExecContext(ctx, string(content)); err != nil {
-			return i - 1, fmt.Errorf("failed to apply migration %d: %w", i, err)
+		case "npm":
+			{
+				paloMeta, err = ScanNpmPackages(ctx, client, model, mcp)
+				if err != nil {
+					log.Info().Msgf("Failed to scan NPM packages: %v", err)
+					break
+				}
+			}
+		case "oci":
+			{
+				//docker?
+			}
 		}
 	}
-	return maxMigration, nil
+
+	if paloMeta == nil {
+		if mcp.Repository.Source == "github" {
+			log.Info().Msgf("Skipping review for GitHub repository")
+			//ReviewGithub()
+		} else {
+			paloMeta = &PaloMeta{
+				PaloExtensions{Score: -999, Review: "This Server has no packages or code available for review"}}
+		}
+	}
+
+	paloMetaJson, err := json.Marshal(paloMeta)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return paloMetaJson, nil
 }
