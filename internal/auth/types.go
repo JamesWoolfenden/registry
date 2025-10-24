@@ -4,16 +4,21 @@ package auth
 type Method string
 
 const (
-	// GitHub OAuth authentication (access token)
+	// MethodGitHubAT - GitHub OAuth authentication (access token)
 	MethodGitHubAT Method = "github-at"
-	// GitHub Actions OIDC authentication
+
+	// MethodGitHubOIDC - GitHub Actions OIDC authentication
 	MethodGitHubOIDC Method = "github-oidc"
-	// Generic OIDC authentication
+
+	// MethodOIDC - Generic OIDC authentication
 	MethodOIDC Method = "oidc"
-	// DNS-based public/private key authentication
+
+	// MethodDNS - DNS-based public/private key authentication
 	MethodDNS Method = "dns"
-	// HTTP-based public/private key authentication
+
+	// MethodHTTP - HTTP-based public/private key authentication
 	MethodHTTP Method = "http"
-	// No authentication - should only be used for local development and testing
+
+	// MethodNone - No authentication - should only be used for local development and testing
 	MethodNone Method = "none"
 )

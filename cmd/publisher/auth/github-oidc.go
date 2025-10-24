@@ -110,12 +110,12 @@ func (o *GitHubOIDCProvider) getOIDCTokenFromGitHub(ctx context.Context) (string
 	// Check for required environment variables
 	requestToken := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
 	if requestToken == "" {
-		return "", fmt.Errorf("ACTIONS_ID_TOKEN_REQUEST_TOKEN environment variable not found - are you running in GitHub Actions with id-token: write permissions?")
+		return "", fmt.Errorf("ACTIONS_ID_TOKEN_REQUEST_TOKEN environment variable not found - are you running in GitHub Actions with id-token: write permissions")
 	}
 
 	requestURL := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
 	if requestURL == "" {
-		return "", fmt.Errorf("ACTIONS_ID_TOKEN_REQUEST_URL environment variable not found - are you running in GitHub Actions with id-token: write permissions?")
+		return "", fmt.Errorf("ACTIONS_ID_TOKEN_REQUEST_URL environment variable not found - are you running in GitHub Actions with id-token: write permissions")
 	}
 
 	// Build the full URL with audience parameter

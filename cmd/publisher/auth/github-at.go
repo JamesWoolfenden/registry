@@ -14,7 +14,8 @@ import (
 const (
 	gitHubTokenFilePath   = ".mcpregistry_github_token"   // #nosec:G101
 	registryTokenFilePath = ".mcpregistry_registry_token" // #nosec:G101
-	// GitHub OAuth URLs
+
+	// GitHubDeviceCodeURL GitHub OAuth URLs
 	GitHubDeviceCodeURL  = "https://github.com/login/device/code"        // #nosec:G101
 	GitHubAccessTokenURL = "https://github.com/login/oauth/access_token" // #nosec:G101
 )

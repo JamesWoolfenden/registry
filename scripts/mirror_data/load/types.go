@@ -40,7 +40,6 @@ type npmRegistryResponse struct {
 			Tarball string `json:"tarball"`
 		} `json:"dist"`
 	} `json:"versions"`
-	// "dist-tags": {"latest": "x.y.z"}
 	DistTags map[string]string `json:"dist-tags"`
 }
 

@@ -91,10 +91,10 @@ func checkExistsInDB(ctx context.Context, db *sql.DB, serverName, version string
 	var isLatest sql.NullBool
 
 	err := db.QueryRowContext(ctx, `
-		SELECT 
+		SELECT
 			COUNT(*) as count,
 			BOOL_OR(is_latest) as is_latest
-		FROM servers 
+		FROM servers
 		WHERE server_name = $1 AND value->>'version' = $2
 	`, serverName, version).Scan(&count, &isLatest)
 
@@ -137,7 +137,12 @@ func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error 
 		return fmt.Errorf("failed to analyze data: %w", err)
 	}
 
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close rows: %v", err)
+		}
+	}(rows)
 
 	if rows.Err() != nil {
 		return fmt.Errorf("failed to analyze data: %w", rows.Err())
@@ -170,7 +175,12 @@ func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error 
 	`)
 
 	if err == nil {
-		defer rows.Close()
+		defer func(rows *sql.Rows) {
+			err := rows.Close()
+			if err != nil {
+				log.Error().Msgf("Failed to close rows: %v", err)
+			}
+		}(rows)
 		for rows.Next() {
 			var name, version string
 			err := rows.Scan(&name, &version)
@@ -181,7 +191,12 @@ func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error 
 		}
 	}
 
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Error().Msgf("failed to close rows: %v", err)
+		}
+	}(rows)
 
 	if rows.Err() != nil {
 		return fmt.Errorf("failed to analyze data: %w", err)
@@ -332,11 +347,6 @@ func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.
 	updatedAt := mcp["updatedAt"]
 	isLatest := mcp["isLatest"]
 
-	//OldReview, ok := meta["www.paloaltonetworks.com/official"].(string)
-	//if !ok {
-	//	OldReview = ""
-	//}
-
 	exists, latestInDB, err := checkExistsInDB(ctx, db, serverName, version)
 	if err != nil {
 		return fmt.Errorf("failed to check if server exists: %w", err)
@@ -346,7 +356,7 @@ func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.
 		if latestInDB != isLatest {
 			// Update is_latest field only using the transaction
 			_, err = tx.ExecContext(ctx, `
-				UPDATE servers 
+				UPDATE servers
 				SET is_latest = $1, updated_at = NOW()
 				WHERE server_name = $2 AND value->>'version' = $3
 			`, isLatest, serverName, version)
@@ -363,7 +373,7 @@ func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.
 	}
 
 	// Generate review for new server
-	paloMeta, err := review(value)
+	paloMeta, err := review(ctx, value)
 	if err != nil {
 		return fmt.Errorf("failed to generate review: %w", err)
 	}
@@ -378,16 +388,19 @@ func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.
 	return nil
 }
 
-func review(value []uint8) ([]byte, error) {
+func review(ctx context.Context, value []uint8) ([]byte, error) {
 	const model = "gemini-2.5-flash"
 	config := loadConfig()
 
-	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Project:  config.GCPProject,
 		Location: "us-central1",
 		Backend:  genai.BackendVertexAI,
 	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
 
 	var paloMeta *PaloMeta
 

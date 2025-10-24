@@ -17,7 +17,7 @@ type PermissionAction string
 
 const (
 	PermissionActionPublish PermissionAction = "publish"
-	// Intended for admins taking moderation actions only, at least for now
+	// PermissionActionEdit - Intended for admins taking moderation actions only, at least for now
 	PermissionActionEdit PermissionAction = "edit"
 )
 
@@ -69,7 +69,7 @@ func NewJWTManager(cfg *config.Config) *JWTManager {
 	}
 }
 
-// GenerateToken generates a new Registry JWT token
+// GenerateTokenResponse generates a new Registry JWT token
 func (j *JWTManager) GenerateTokenResponse(_ context.Context, claims JWTClaims) (*TokenResponse, error) {
 	// Check whether they have global permissions (used by admins)
 	hasGlobalPermissions := false

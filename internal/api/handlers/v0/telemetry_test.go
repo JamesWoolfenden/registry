@@ -9,8 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
-	"github.com/stretchr/testify/assert"
-
 	v0 "github.com/modelcontextprotocol/registry/internal/api/handlers/v0"
 	"github.com/modelcontextprotocol/registry/internal/api/router"
 	"github.com/modelcontextprotocol/registry/internal/config"
@@ -19,6 +17,7 @@ import (
 	"github.com/modelcontextprotocol/registry/internal/telemetry"
 	apiv0 "github.com/modelcontextprotocol/registry/pkg/api/v0"
 	"github.com/modelcontextprotocol/registry/pkg/model"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPrometheusHandler(t *testing.T) {
@@ -53,8 +52,8 @@ func TestPrometheusHandler(t *testing.T) {
 	mux.Handle("/metrics", metrics.PrometheusHandler())
 
 	// Create request - using latest version endpoint
-	url := "/v0/servers/" + url.PathEscape(server.Server.Name) + "/versions/latest"
-	req := httptest.NewRequest(http.MethodGet, url, nil)
+	URL := "/v0/servers/" + url.PathEscape(server.Server.Name) + "/versions/latest"
+	req := httptest.NewRequest(http.MethodGet, URL, nil)
 	w := httptest.NewRecorder()
 
 	// Serve the request

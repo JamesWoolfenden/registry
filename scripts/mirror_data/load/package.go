@@ -4,12 +4,12 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
-	"path/filepath"
-	"strings"
-
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 )
@@ -25,9 +25,8 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode != 200 {
-		log.Error().Msgf("Failed to fetch npm registry: %v", resp.StatusCode)
-		return nil, err
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch npm registry: %v", resp.StatusCode)
 	}
 
 	defer func(Body io.ReadCloser) {
@@ -39,26 +38,61 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 
 	var meta npmRegistryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
-		log.Error().Msgf("Failed to decode registry response: %v", err)
 		return nil, err
 	}
 
 	latestVersion, ok := meta.DistTags["latest"]
 	if !ok {
-		log.Error().Msgf("Could not find latest version: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("could not find latest version: %s", latestVersion)
 	}
 
 	versionInfo, ok := meta.Versions[latestVersion]
 	if !ok {
-		log.Error().Msgf("Could not find version info: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("could not find version info for latest version: %s", latestVersion)
 	}
 
 	tarballURL := versionInfo.Dist.Tarball
 	if tarballURL == "" {
-		log.Error().Msgf("Could not find tarball URL: %v", err)
+		return nil, fmt.Errorf("tarball URL cannot be empty")
+	}
+
+	tr, err := getPackageCode(tarballURL)
+
+	if err != nil {
 		return nil, err
+	}
+
+	var AllCode []string
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatal().Msgf("failed to get next file %v", err)
+		}
+
+		ext := filepath.Ext(header.Name)
+
+		if header.Typeflag == tar.TypeReg && !strings.Contains(header.Name, "._") && codeExtensions[ext] {
+			content, err := io.ReadAll(tr)
+			if err != nil {
+				log.Fatal().Msgf("failed to read: %v", err)
+			}
+
+			AllCode = append(AllCode, "// File: "+header.Name+"\n"+string(content))
+		}
+	}
+
+	return AllCode, nil
+}
+
+func getPackageCode(tarballURL string) (*tar.Reader, error) {
+	if tarballURL == "" {
+		log.Error().Msg("tarball URL is empty")
+		return nil, fmt.Errorf("tarball URL is empty")
 	}
 
 	// Download the tarball
@@ -67,6 +101,7 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 		log.Error().Msgf("Failed to download tarball: %v ", err)
 		return nil, err
 	}
+
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
@@ -111,30 +146,5 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 	}(gzr)
 
 	tr := tar.NewReader(gzr)
-
-	var AllCode []string
-
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			log.Fatal().Msgf("failed to get next file %v", err)
-		}
-
-		ext := filepath.Ext(header.Name)
-
-		if header.Typeflag == tar.TypeReg && !strings.Contains(header.Name, "._") && codeExtensions[ext] {
-			content, err := io.ReadAll(tr)
-			if err != nil {
-				log.Fatal().Msgf("failed to read: %v", err)
-			}
-
-			AllCode = append(AllCode, "// File: "+header.Name+"\n"+string(content))
-		}
-	}
-
-	return AllCode, nil
+	return tr, nil
 }
