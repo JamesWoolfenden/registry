@@ -173,30 +173,24 @@ func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error 
 		WHERE value->>'status' IS NULL
 		LIMIT 5
 	`)
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close rows: %v", err)
+		}
+	}()
 
 	if err == nil {
-		defer func(rows *sql.Rows) {
-			err := rows.Close()
-			if err != nil {
-				log.Error().Msgf("Failed to close rows: %v", err)
-			}
-		}(rows)
 		for rows.Next() {
 			var name, version string
 			err := rows.Scan(&name, &version)
 			if err != nil {
-				return fmt.Errorf("failed to scan sample data: %w", err)
+				log.Error().Msgf("failed to scan sample data: %v", err)
+				continue
 			}
 			log.Info().Msgf("  - %s@%s", name, version)
 		}
 	}
-
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			log.Error().Msgf("failed to close rows: %v", err)
-		}
-	}(rows)
 
 	if rows.Err() != nil {
 		return fmt.Errorf("failed to analyze data: %w", err)
@@ -413,7 +407,6 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 	if len(mcp.Packages) > 0 {
 		first := mcp.Packages[0]
 		switch first.RegistryType {
-
 		case "npm":
 			{
 				paloMeta, err = ScanNpmPackages(ctx, client, model, mcp)
@@ -424,7 +417,8 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 			}
 		case "oci":
 			{
-				//docker?
+				log.Info().Msgf("Skipping OCI registry type: %s", first.RegistryType)
+				// docker?
 			}
 		}
 	}
@@ -432,18 +426,18 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 	if paloMeta == nil {
 		if mcp.Repository.Source == "github" {
 			log.Info().Msgf("Skipping review for GitHub repository")
-			//ReviewGithub()
+			// ReviewGithub()
 		} else {
 			paloMeta = &PaloMeta{
 				PaloExtensions{Score: -999, Review: "This Server has no packages or code available for review"}}
 		}
 	}
 
-	paloMetaJson, err := json.Marshal(paloMeta)
+	paloMetaJSON, err := json.Marshal(paloMeta)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return paloMetaJson, nil
+	return paloMetaJSON, nil
 }

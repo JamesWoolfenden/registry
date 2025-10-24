@@ -19,7 +19,7 @@ func ScanNpmPackages(ctx context.Context, client *genai.Client, model string, mc
 		return nil, err
 	}
 
-	Palo, err := Dispatch(AllCode, ctx, client, model)
+	Palo, err := Dispatch(ctx, AllCode, client, model)
 	if err != nil {
 		log.Error().Msgf("Error dispatching library: %v", err)
 		return nil, err

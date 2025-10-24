@@ -18,25 +18,27 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 	codeExtensions := map[string]bool{
 		".js": true, ".ts": true, ".cjs": true, ".map": true, ".cts": true,
 	}
-	resp, err := http.Get(registryURL)
+
+	resp, err := http.Get(registryURL) //nolint:all
 
 	if err != nil {
 		log.Error().Msgf("Failed to fetch npm registry: %v", err.Error())
 		return nil, err
 	}
 
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close response body: %v ", err)
+		}
+	}()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch npm registry: %v", resp.StatusCode)
 	}
 
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Error().Msgf("Failed to close response body: %v ", err)
-		}
-	}(resp.Body)
-
 	var meta npmRegistryResponse
+
 	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
 		return nil, err
 	}
@@ -71,7 +73,8 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 		}
 
 		if err != nil {
-			log.Fatal().Msgf("failed to get next file %v", err)
+			log.Error().Msgf("failed to get next file %v", err)
+			continue
 		}
 
 		ext := filepath.Ext(header.Name)
@@ -79,7 +82,8 @@ func GetArchiveCode(registryURL string) ([]string, error) {
 		if header.Typeflag == tar.TypeReg && !strings.Contains(header.Name, "._") && codeExtensions[ext] {
 			content, err := io.ReadAll(tr)
 			if err != nil {
-				log.Fatal().Msgf("failed to read: %v", err)
+				log.Info().Msgf("failed to read: %v", err)
+				continue
 			}
 
 			AllCode = append(AllCode, "// File: "+header.Name+"\n"+string(content))
@@ -96,7 +100,7 @@ func getPackageCode(tarballURL string) (*tar.Reader, error) {
 	}
 
 	// Download the tarball
-	tarResp, err := http.Get(tarballURL)
+	tarResp, err := http.Get(tarballURL) //nolint:all
 	if err != nil {
 		log.Error().Msgf("Failed to download tarball: %v ", err)
 		return nil, err
