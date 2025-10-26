@@ -38,7 +38,7 @@ Server authors SHOULD use versions aligned with their underlying packages to red
 ```
 
 ### 3. Multiple Registry Versions
-If server authors expect to have multiple registry versions for the same package version, they SHOULD follow the 
+If server authors expect to have multiple registry versions for the same package version, they SHOULD follow the
 semantic version spec using the prerelease label:
 
 ```json
@@ -58,7 +58,7 @@ semantic version spec using the prerelease label:
 ## Version Ordering and "Latest" Determination
 
 ### For Semantic Versions
-The registry attempts to parse versions as semantic versions. If successful, it uses semantic version comparison rules 
+The registry attempts to parse versions as semantic versions. If successful, it uses semantic version comparison rules
 to determine:
 - Version ordering in lists
 - Which version is marked as `isLatest`
@@ -68,7 +68,7 @@ If version parsing as semantic version fails:
 - The registry will always mark the version as latest (overriding any previous version)
 - Clients should fall back to using publish timestamp for ordering
 
-**Important Note**: This behavior means that for servers with mixed semantic and non-semantic versions, the `isLatest` 
+**Important Note**: This behavior means that for servers with mixed semantic and non-semantic versions, the `isLatest`
 flag may not align with the total ordering. A non-semantic version published after semantic versions will be marked as
 latest, even if semantic versions are considered "higher" in the ordering.
 
@@ -106,7 +106,7 @@ Registry clients SHOULD:
 ```
 
 ### Not Allowed: Version Ranges
-The registry requires specific versions for both the top-level `version` and any `packages[].version`. Version ranges 
+The registry requires specific versions for both the top-level `version` and any `packages[].version`. Version ranges
 or wildcard versions are rejected during publish, including but not limited to:
 
 ```javascript
@@ -136,7 +136,7 @@ or wildcard versions are rejected during publish, including but not limited to:
 
 ## Migration Path
 
-Existing servers with non-semantic versions will continue to work without changes. However, to benefit from proper 
+Existing servers with non-semantic versions will continue to work without changes. However, to benefit from proper
 version ordering, server maintainers are encouraged to:
 
 1. Adopt semantic versioning for new releases
@@ -235,6 +235,6 @@ Do you have underlying packages?
 
 ## Future Considerations
 
-This versioning approach is designed to be compatible with potential future changes to the MCP specification's 
+This versioning approach is designed to be compatible with potential future changes to the MCP specification's
 `Implementation.version` field. Any SHOULD requirements introduced here may be proposed as updates to the specification
 through the SEP (Specification Enhancement Proposal) process.

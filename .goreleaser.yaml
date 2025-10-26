@@ -21,7 +21,7 @@ builds:
       - -X main.Version={{.Version}}
       - -X main.GitCommit={{.FullCommit}}
       - -X main.BuildTime={{.Date}}
-    
+
   # Publisher CLI tool binary
   - id: publisher
     binary: mcp-publisher
@@ -102,7 +102,7 @@ signs:
     artifacts: archive
     output: true
     certificate: '{{ trimsuffix (trimsuffix .Env.artifact ".zip") ".tar.gz" }}.pem'
-    
+
   # Also sign checksums file for additional verification
   - id: checksums
     cmd: cosign

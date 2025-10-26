@@ -10,6 +10,7 @@ import (
 )
 
 func TestScanNpmPackages(t *testing.T) {
+	// nosec
 	type args struct {
 		ctx    context.Context
 		client *genai.Client
@@ -45,7 +46,7 @@ func TestScanNpmPackages(t *testing.T) {
 	var pack myPackage
 
 	mcp2.Packages = append(mcp2.Packages, pack)
-	mcp3.Packages = append(mcp2.Packages, pack)
+	mcp3.Packages = append(mcp3.Packages, pack)
 	mcp3.Packages[0].Identifier = "test package"
 
 	pack.Identifier = "test package"

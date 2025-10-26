@@ -75,7 +75,7 @@ jobs:
 
 You don't need any secrets for publishing to the MCP Registry using GitHub OIDC.
 
-However you might need to add secrets for your package registry. For example the workflow above needs a `NPM_TOKEN` 
+However you might need to add secrets for your package registry. For example the workflow above needs a `NPM_TOKEN`
 (which you can add in Settings → Secrets and variables → Actions).
 
 ### Step 3: Tag and Release

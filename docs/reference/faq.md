@@ -133,7 +133,7 @@ DNS verification ensures namespace ownership. For example:
 
 The MVP delegates security scanning to:
 - underlying package registries; and
-- subregistries
+- sub-registries
 
 ### How is spam prevented?
 
@@ -141,7 +141,7 @@ The MVP delegates security scanning to:
 - Character limits and regex validation on free-form fields
 - Manual takedown of spam or malicious servers
 
-In future we might explore:
+In future, we might explore:
 - Stricter rate limiting (e.g., 10 new servers per user per day)
 - Potential AI-based spam detection
 - Community reporting and admin blacklisting capabilities

@@ -247,7 +247,7 @@ components:
       bearerFormat: JWT
       description: |
         Registry-specific authentication token. The authentication mechanism and token format may vary between registry implementations.
-        
+
         Some registries may use JWT tokens, others may use API keys or OAuth. Consult your specific registry's authentication documentation.
   schemas:
     Repository:

@@ -7,7 +7,7 @@ For step-by-step publishing instructions, see the [publishing guide](../../guide
 
 ## Overview
 
-While the [generic server.json format](./generic-server-json.md) defines the base specification, the official registry enforces additional 
+While the [generic server.json format](./generic-server-json.md) defines the base specification, the official registry enforces additional
 validation to ensure:
 
 - **Namespace authentication** - Servers are published under appropriate namespaces
@@ -25,7 +25,7 @@ See the [publishing guide](../../guides/publishing/publish-server.md) for authen
 
 ## Package Ownership Verification
 
-All packages must include metadata proving the publisher owns them. This prevents impersonation and ensures 
+All packages must include metadata proving the publisher owns them. This prevents impersonation and ensures
 authenticity (see more reasoning in [#96](https://github.com/modelcontextprotocol/registry/issues/96)).
 
 For detailed verification requirements for each registry type, see the [publishing guide](../../guides/publishing/publish-server.md).

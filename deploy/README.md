@@ -160,7 +160,7 @@ When running locally they are stored in a Minio bucket. In staging and productio
 kubectl port-forward -n minio svc/minio 9000:9000 9001:9001
 ```
 
-Then open [localhost:9001](http://localhost:9001), login with username `minioadmin` and password `minioadmin`, and navigate to the 
+Then open [localhost:9001](http://localhost:9001), login with username `minioadmin` and password `minioadmin`, and navigate to the
 k8up-backups bucket.
 
 ##### Staging and Production (GCS)

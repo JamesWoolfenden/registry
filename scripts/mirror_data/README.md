@@ -1,7 +1,7 @@
 # Mirror Production Data
 
-The Tools to fetch and load production registry data for local testing and migration debugging, 
-and to enable sub-registries to sync up new data. It also gives us an opportunity to examine 
+The Tools to fetch and load production registry data for local testing and migration debugging,
+and to enable sub-registries to sync up new data. It also gives us an opportunity to examine
 and review prior to listing.
 
 ## Overview
@@ -41,7 +41,7 @@ Output: `production_servers.json` containing all server records
 
 ### 2. Set Up (Test) Database
 
-You can start a PostgreSQL container for testing or connect to instance running in your local compose 
+You can start a PostgreSQL container for testing or connect to instance running in your local compose
 stack, or use the docker compose stack (current preference):
 
 ```bash
