@@ -4,7 +4,7 @@ default_language_version:
   python: python3.11
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-json
       - id: check-merge-conflict
@@ -39,7 +39,7 @@ repos:
       - id: terraform-fmt
         language_version: python3.11
   - repo: https://github.com/gruntwork-io/pre-commit
-    rev: v0.1.29
+    rev: v0.1.30
     hooks:
       - id: gofmt
       - id: goimports
@@ -51,6 +51,10 @@ repos:
         args: [ "./..." ]
       - id: go-mod-tidy
       - id: go-generate
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.5.0
+    hooks:
+     - id: golangci-lint
 #  - repo: https://github.com/jameswoolfenden/ghat
 #    rev: v0.1.13
 #    hooks:
