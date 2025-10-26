@@ -11,7 +11,7 @@ import (
 
 //nolint:all
 func TestScanNpmPackages(t *testing.T) {
-
+	
 	type args struct {
 		client *genai.Client
 		model  string
@@ -21,6 +21,7 @@ func TestScanNpmPackages(t *testing.T) {
 	const model = "gemini-2.5-flash"
 	config := loadConfig()
 
+	ctx := context.Background()
 	client, _ := genai.NewClient(ctx, &genai.ClientConfig{
 		Project:  config.GCPProject,
 		Location: "us-central1",
@@ -56,9 +57,9 @@ func TestScanNpmPackages(t *testing.T) {
 		want    *PaloMeta
 		wantErr bool
 	}{
-		{"nil", args{client, model, mcp}, nil, true},
-		{"empty", args{client, model, mcp2}, nil, true},
-		{"not exist", args{client, model, mcp3}, nil, true},
+		{"nil", args{ client, model, mcp}, nil, true},
+		{"empty", args{ client, model, mcp2}, nil, true},
+		{"not exist", args{ client, model, mcp3}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
