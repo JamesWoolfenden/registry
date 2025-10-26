@@ -8,8 +8,21 @@ import (
 	"google.golang.org/genai"
 )
 
+const npmRegistry = "https://registry.npmjs.org"
+
 func ScanNpmPackages(ctx context.Context, client *genai.Client, model string, mcp Server) (*PaloMeta, error) {
-	registryURL := fmt.Sprintf("https://registry.npmjs.org/%s", mcp.Packages[0].Identifier)
+	query := fmt.Sprint(npmRegistry, "/%s")
+
+	if len(mcp.Packages) == 0 {
+		return nil, fmt.Errorf("no packages found")
+	}
+
+	packageName := mcp.Packages[0].Identifier
+	if packageName == "" {
+		return nil, fmt.Errorf("package name %s is empty", packageName)
+	}
+
+	registryURL := fmt.Sprintf(query, mcp.Packages[0].Identifier)
 	log.Info().Str("url", registryURL).Msg("scanning package")
 
 	AllCode, err := GetArchiveCode(registryURL)
