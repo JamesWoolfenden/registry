@@ -9,16 +9,15 @@ import (
 	"google.golang.org/genai"
 )
 
+//nolint:all
 func TestScanNpmPackages(t *testing.T) {
-	// nosec
+
 	type args struct {
-		ctx    context.Context
 		client *genai.Client
 		model  string
 		mcp    Server
 	}
 
-	var ctx = context.Background()
 	const model = "gemini-2.5-flash"
 	config := loadConfig()
 
@@ -57,13 +56,15 @@ func TestScanNpmPackages(t *testing.T) {
 		want    *PaloMeta
 		wantErr bool
 	}{
-		{"nil", args{ctx, client, model, mcp}, nil, true},
-		{"empty", args{ctx, client, model, mcp2}, nil, true},
-		{"not exist", args{ctx, client, model, mcp3}, nil, true},
+		{"nil", args{client, model, mcp}, nil, true},
+		{"empty", args{client, model, mcp2}, nil, true},
+		{"not exist", args{client, model, mcp3}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ScanNpmPackages(tt.args.ctx, tt.args.client, tt.args.model, tt.args.mcp)
+
+			ctx := context.Background()
+			got, err := ScanNpmPackages(ctx, tt.args.client, tt.args.model, tt.args.mcp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ScanNpmPackages() error = %v, wantErr %v", err, tt.wantErr)
 				return
