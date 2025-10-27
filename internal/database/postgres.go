@@ -248,7 +248,7 @@ func (db *PostgreSQL) GetServerByName(ctx context.Context, tx pgx.Tx, serverName
 	}
 
 	query := `
-		SELECT server_name, version, status, published_at, updated_at, is_latest, value
+		SELECT server_name, version, status, published_at, updated_at, is_latest, value, faun
 		FROM servers
 		WHERE server_name = $1 AND is_latest = true
 		ORDER BY published_at DESC
@@ -258,9 +258,11 @@ func (db *PostgreSQL) GetServerByName(ctx context.Context, tx pgx.Tx, serverName
 	var name, version, status string
 	var publishedAt, updatedAt time.Time
 	var isLatest bool
-	var valueJSON []byte
+	var valueJSON, faunJSON []byte
 
-	err := db.getExecutor(tx).QueryRow(ctx, query, serverName).Scan(&name, &version, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON)
+	err := db.getExecutor(tx).QueryRow(ctx, query, serverName).Scan(
+		&name, &version, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON, &faunJSON)
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -274,6 +276,11 @@ func (db *PostgreSQL) GetServerByName(ctx context.Context, tx pgx.Tx, serverName
 		return nil, fmt.Errorf("failed to unmarshal server JSON: %w", err)
 	}
 
+	var faun apiv0.PaloExtensions
+	if err := json.Unmarshal(faunJSON, &faun); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal faun JSON: %w", err)
+	}
+
 	// Build ServerResponse with separated metadata
 	serverResponse := &apiv0.ServerResponse{
 		Server: serverJSON,
@@ -283,6 +290,18 @@ func (db *PostgreSQL) GetServerByName(ctx context.Context, tx pgx.Tx, serverName
 				PublishedAt: publishedAt,
 				UpdatedAt:   updatedAt,
 				IsLatest:    isLatest,
+			},
+			Palo: &apiv0.PaloExtensions{
+				SourceCode: apiv0.SourceCodeAnalysis{
+					Score:   faun.SourceCode.Score,
+					Review:  faun.SourceCode.Review,
+					Updated: faun.SourceCode.Updated,
+				},
+				Author: apiv0.AuthorAnalysis{
+					Score:   faun.Author.Score,
+					Review:  faun.Author.Review,
+					Updated: faun.Author.Updated,
+				},
 			},
 		},
 	}
@@ -297,7 +316,7 @@ func (db *PostgreSQL) GetServerByNameAndVersion(ctx context.Context, tx pgx.Tx, 
 	}
 
 	query := `
-		SELECT server_name, version, status, published_at, updated_at, is_latest, value
+		SELECT server_name, version, status, published_at, updated_at, is_latest, value, faun
 		FROM servers
 		WHERE server_name = $1 AND version = $2
 		LIMIT 1
@@ -306,9 +325,9 @@ func (db *PostgreSQL) GetServerByNameAndVersion(ctx context.Context, tx pgx.Tx, 
 	var name, vers, status string
 	var publishedAt, updatedAt time.Time
 	var isLatest bool
-	var valueJSON []byte
+	var valueJSON, faunJSON []byte
 
-	err := db.getExecutor(tx).QueryRow(ctx, query, serverName, version).Scan(&name, &vers, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON)
+	err := db.getExecutor(tx).QueryRow(ctx, query, serverName, version).Scan(&name, &vers, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON, &faunJSON)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -322,6 +341,11 @@ func (db *PostgreSQL) GetServerByNameAndVersion(ctx context.Context, tx pgx.Tx, 
 		return nil, fmt.Errorf("failed to unmarshal server JSON: %w", err)
 	}
 
+	var faun apiv0.PaloExtensions
+	if err := json.Unmarshal(faunJSON, &faun); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal faun JSON: %w", err)
+	}
+
 	// Build ServerResponse with separated metadata
 	serverResponse := &apiv0.ServerResponse{
 		Server: serverJSON,
@@ -331,6 +355,18 @@ func (db *PostgreSQL) GetServerByNameAndVersion(ctx context.Context, tx pgx.Tx, 
 				PublishedAt: publishedAt,
 				UpdatedAt:   updatedAt,
 				IsLatest:    isLatest,
+			},
+			Palo: &apiv0.PaloExtensions{
+				SourceCode: apiv0.SourceCodeAnalysis{
+					Score:   faun.SourceCode.Score,
+					Review:  faun.SourceCode.Review,
+					Updated: faun.SourceCode.Updated,
+				},
+				Author: apiv0.AuthorAnalysis{
+					Score:   faun.Author.Score,
+					Review:  faun.Author.Review,
+					Updated: faun.Author.Updated,
+				},
 			},
 		},
 	}
