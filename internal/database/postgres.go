@@ -161,7 +161,7 @@ func (db *PostgreSQL) ListServers(
 
 	// Query servers table with hybrid column/JSON data
 	query := fmt.Sprintf(`
-        SELECT server_name, version, status, published_at, updated_at, is_latest, value
+        SELECT server_name, version, status, published_at, updated_at, is_latest, value, faun
         FROM servers
         %s
         ORDER BY server_name, version
@@ -181,8 +181,9 @@ func (db *PostgreSQL) ListServers(
 		var publishedAt, updatedAt time.Time
 		var isLatest bool
 		var valueJSON []byte
+		var faunJSON []byte
 
-		err := rows.Scan(&serverName, &version, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON)
+		err := rows.Scan(&serverName, &version, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON, &faunJSON)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to scan server row: %w", err)
 		}
@@ -190,6 +191,11 @@ func (db *PostgreSQL) ListServers(
 		// Parse the ServerJSON from JSONB
 		var serverJSON apiv0.ServerJSON
 		if err := json.Unmarshal(valueJSON, &serverJSON); err != nil {
+			return nil, "", fmt.Errorf("failed to unmarshal server JSON: %w", err)
+		}
+		
+		var faun apiv0.PaloExtensions
+		if err := json.Unmarshal(faunJSON, &faun); err != nil {
 			return nil, "", fmt.Errorf("failed to unmarshal server JSON: %w", err)
 		}
 
@@ -204,8 +210,16 @@ func (db *PostgreSQL) ListServers(
 					IsLatest:    isLatest,
 				},
 				Palo: &apiv0.PaloExtensions{
-					Score:  -999,
-					Review: "This is toast",
+					SourceCode: apiv0.SourceCodeAnalysis{
+						Score:   faun.SourceCode.Score,
+						Review:  faun.SourceCode.Review,
+						Updated: faun.SourceCode.Updated,
+					},
+					Author: apiv0.AuthorAnalysis{
+						Score:   faun.Author.Score,
+						Review:  faun.Author.Review,
+						Updated: faun.Author.Updated,
+					},
 				},
 			},
 		}

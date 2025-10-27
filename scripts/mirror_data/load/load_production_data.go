@@ -25,7 +25,7 @@ type Config struct {
 
 func loadConfig() *Config {
 	return &Config{
-		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_servers.json"),
+		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy.json"),
 		SkipMigrations: getEnvBool("SKIP_MIGRATIONS", true),
 		DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
 		BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),
@@ -220,7 +220,7 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("failed to parse export file: %w", err)
 	}
 
-	log.Info().Msgf("Loading %d servers in batches of 30...\n", len(prodData.Servers))
+	log.Info().Msgf("Loading %d servers in batches of 30...", len(prodData.Servers))
 
 	const batchSize = 30
 	totalServers := len(prodData.Servers)
@@ -410,6 +410,8 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 		case "npm":
 			{
 				paloMeta, err = ScanNpmPackages(ctx, client, model, mcp)
+				AuthorAnalysis(paloMeta)
+
 				if err != nil {
 					log.Info().Msgf("Failed to scan NPM packages: %v", err)
 					break
@@ -426,10 +428,12 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 	if paloMeta == nil {
 		if mcp.Repository.Source == "github" {
 			log.Info().Msgf("Skipping review for GitHub repository")
-			// ReviewGithub()
+			paloMeta, err = ScanRepo(ctx, client, model, mcp)
 		} else {
-			paloMeta = &PaloMeta{
-				PaloExtensions{Score: -999, Review: "This Server has no packages or code available for review"}}
+			var paloMeta PaloMeta
+			paloMeta.SourceCodeAnalysis.Score = -999
+			paloMeta.SourceCodeAnalysis.Review = "No reviewable source found for this server"
+			paloMeta.SourceCodeAnalysis.Updated = timestamp()
 		}
 	}
 
@@ -440,4 +444,10 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 	}
 
 	return paloMetaJSON, nil
+}
+
+func AuthorAnalysis(paloMeta *PaloMeta) {
+	paloMeta.AuthorAnalysis.Score = -55
+	paloMeta.AuthorAnalysis.Review = "Leet Haxors Review Details"
+	paloMeta.AuthorAnalysis.Updated = timestamp()
 }

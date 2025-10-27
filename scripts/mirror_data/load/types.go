@@ -1,12 +1,16 @@
 package main
 
 type PaloMeta struct {
-	Palo PaloExtensions `json:"www.paloaltonetworks.com,omitempty" doc:"Palo MCP registry metadata"`
-}
-
-type PaloExtensions struct {
-	Score  int    `json:"score"`
-	Review string `json:"review"`
+	SourceCodeAnalysis struct {
+		Score   int    `json:"score"`
+		Review  string `json:"review"`
+		Updated string `json:"updated"`
+	} `json:"sourceCodeAnalysis" doc:"Source Code Analysis"`
+	AuthorAnalysis struct {
+		Score   int    `json:"score"`
+		Review  string `json:"review"`
+		Updated string `json:"updated"`
+	} `json:"authorAnalysis" doc:"Source Code Analysis"`
 }
 
 type Server struct {

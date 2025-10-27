@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"google.golang.org/genai"
@@ -15,8 +16,9 @@ func Dispatch(ctx context.Context, allCode []string, client *genai.Client, model
 
 	if len(allCode) == 0 {
 		log.Info().Msg("No code files found for review")
-		paloExtensions.Palo.Review = "No Code"
-		paloExtensions.Palo.Score = 0
+		paloExtensions.SourceCodeAnalysis.Review = "No Code"
+		paloExtensions.SourceCodeAnalysis.Score = 0
+		paloExtensions.SourceCodeAnalysis.Updated = timestamp()
 		return &paloExtensions, nil
 	}
 
@@ -24,12 +26,13 @@ func Dispatch(ctx context.Context, allCode []string, client *genai.Client, model
 	response, err := GenerateWithTextClient(ctx, client, combinedCode, "all files", model)
 	if err != nil {
 		log.Error().Msgf("Error generating review: %v", err)
-		paloExtensions.Palo.Review = fmt.Sprintf("Analysis Failed %v", err)
-		paloExtensions.Palo.Score = -999
+		paloExtensions.SourceCodeAnalysis.Review = fmt.Sprintf("Analysis Failed %v", err)
+		paloExtensions.SourceCodeAnalysis.Score = -999
+		paloExtensions.SourceCodeAnalysis.Updated = timestamp()
 		return &paloExtensions, err
 	}
 
-	log.Info().Msgf("Aggregate Score: %d\n", response.Score)
+	log.Info().Msgf("Aggregate Score: %d", response.Score)
 	log.Info().Msgf("Comment:")
 	log.Info().Msgf("%s", response.Comment)
 
@@ -37,9 +40,15 @@ func Dispatch(ctx context.Context, allCode []string, client *genai.Client, model
 		response.Comment = response.Comment[:5000]
 	}
 
-	paloExtensions.Palo.Review = response.Comment
-	paloExtensions.Palo.Score = response.Score
+	paloExtensions.SourceCodeAnalysis.Review = response.Comment
+	paloExtensions.SourceCodeAnalysis.Score = response.Score
+	paloExtensions.SourceCodeAnalysis.Updated = timestamp()
 	return &paloExtensions, nil
+}
+
+func timestamp() string {
+	t := time.Now().UTC()
+	return t.Format("20060102150405")
 }
 
 // GenerateWithTextClient shows how to generate text using a text prompt.

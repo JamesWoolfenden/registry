@@ -23,7 +23,7 @@ func ScanNpmPackages(ctx context.Context, client *genai.Client, model string, mc
 	}
 
 	registryURL := fmt.Sprintf(query, mcp.Packages[0].Identifier)
-	log.Info().Str("url", registryURL).Msg("scanning package")
+	log.Info().Str("url", registryURL).Msg("Scanning package")
 
 	AllCode, err := GetArchiveCode(registryURL)
 

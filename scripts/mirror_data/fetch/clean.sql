@@ -1,0 +1,1 @@
+delete from servers WHERE server_name = 'com.docfork/docfork-mcp' AND version = '1.0.0'

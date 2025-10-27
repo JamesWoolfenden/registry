@@ -14,8 +14,20 @@ type RegistryExtensions struct {
 }
 
 type PaloExtensions struct {
-	Score  int    `json:"score" doc:"Security score heuristic"`
-	Review string `json:"review" doc:"Review of server"`
+	SourceCode SourceCodeAnalysis `json:"sourceCodeAnalysis"  doc:"Source Code Analysis"`
+	Author     AuthorAnalysis     `json:"authorAnalysis,omitempty" doc:"Author Code Analysis"`
+}
+
+type SourceCodeAnalysis struct {
+	Score   int    `json:"score,omitempty"`
+	Review  string `json:"review,omitempty"`
+	Updated string `json:"updated,omitempty"`
+}
+
+type AuthorAnalysis struct {
+	Score   int    `json:"score,omitempty"`
+	Review  string `json:"review,omitempty"`
+	Updated string `json:"updated,omitempty"`
 }
 
 type ResponseMeta struct {
