@@ -1,3 +1,5 @@
+//go:build auth
+
 // !codeanalysis
 package main
 
