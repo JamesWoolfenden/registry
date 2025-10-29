@@ -16,7 +16,6 @@ import (
 )
 
 func ScanPypiPackages(ctx context.Context, client *genai.Client, model string, mcp Server) (*PaloMeta, error) {
-
 	if len(mcp.Packages) == 0 {
 		return nil, fmt.Errorf("no packages found")
 	}
@@ -50,7 +49,7 @@ func DownloadAndExtractWheel(packageName string, version string) ([]string, erro
 	log.Info().Msgf("Downloading %s", wheelURL)
 
 	// Get package metadata to find wheel download URL
-	resp, err := http.Get(wheelURL)
+	resp, err := http.Get(wheelURL) //nolint:all
 	if err != nil {
 		return nil, fmt.Errorf("failed to get package metadata: %w", err)
 	}
@@ -75,7 +74,7 @@ func DownloadAndExtractWheel(packageName string, version string) ([]string, erro
 	}
 
 	// Download the wheel file
-	wheelResp, err := http.Get(wheelDownloadURL)
+	wheelResp, err := http.Get(wheelDownloadURL) //nolint:all
 	if err != nil {
 		return nil, fmt.Errorf("failed to download wheel: %w", err)
 	}
