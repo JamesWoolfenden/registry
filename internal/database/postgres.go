@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-
 	apiv0 "github.com/modelcontextprotocol/registry/pkg/api/v0"
 	"github.com/modelcontextprotocol/registry/pkg/model"
 )
@@ -79,6 +78,7 @@ func NewPostgreSQL(ctx context.Context, connectionURI string) (*PostgreSQL, erro
 	}, nil
 }
 
+//nolint:cyclop
 func (db *PostgreSQL) ListServers(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -180,8 +180,7 @@ func (db *PostgreSQL) ListServers(
 		var serverName, version, status string
 		var publishedAt, updatedAt time.Time
 		var isLatest bool
-		var valueJSON []byte
-		var faunJSON []byte
+		var valueJSON, faunJSON []byte
 
 		err := rows.Scan(&serverName, &version, &status, &publishedAt, &updatedAt, &isLatest, &valueJSON, &faunJSON)
 		if err != nil {
