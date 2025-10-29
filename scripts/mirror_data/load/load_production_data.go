@@ -439,6 +439,10 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 		if mcp.Repository.Source == "github" {
 			log.Info().Msgf("Skipping review for GitHub repository")
 			paloMeta, err = ScanRepo(ctx, client, model, mcp)
+			if err != nil {
+				log.Info().Msgf("Failed to scan repository: %v", err)
+				return nil, err
+			}
 		} else {
 			var paloMeta PaloMeta
 			paloMeta.SourceCodeAnalysis.Score = -999

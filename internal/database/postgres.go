@@ -193,7 +193,7 @@ func (db *PostgreSQL) ListServers(
 		if err := json.Unmarshal(valueJSON, &serverJSON); err != nil {
 			return nil, "", fmt.Errorf("failed to unmarshal server JSON: %w", err)
 		}
-		
+
 		var faun apiv0.PaloExtensions
 		if err := json.Unmarshal(faunJSON, &faun); err != nil {
 			return nil, "", fmt.Errorf("failed to unmarshal server JSON: %w", err)
