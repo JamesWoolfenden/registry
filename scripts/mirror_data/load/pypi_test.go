@@ -27,10 +27,10 @@ func TestScanPypiPackages(t *testing.T) {
 
 	var test Server
 
-	test.Packages=append(test.Packages, Package{
+	test.Packages = append(test.Packages, Package{
 		RegistryType: "pypi",
-		Identifier:"mcpcap",
-		Version: "0.4.3",
+		Identifier:   "mcpcap",
+		Version:      "0.4.3",
 		Transport: Transport{
 			Type: "stdio",
 		},

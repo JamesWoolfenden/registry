@@ -22,22 +22,22 @@ type Server struct {
 		Source string `json:"source,omitempty"`
 		ID     string `json:"id,omitempty"`
 	} `json:"repository,omitempty"`
-	Version  string `json:"version"`
-	Packages []Package`json:"packages"`
+	Version  string    `json:"version"`
+	Packages []Package `json:"packages"`
 }
 
 type Package struct {
-		RegistryType string `json:"registryType"`
-		RegistryBaseUrl string `json:"registryBaseUrl,omitempty"`
-		Identifier   string `json:"identifier"`
-		Version      string `json:"version,omitempty"`
-		Transport    Transport `json:"transport"`
-		EnvironmentVariables []struct {
-			Description string `json:"description"`
-			Name        string `json:"name"`
-			Format      string `json:"format,omitempty"`
-			IsSecret    bool   `json:"isSecret,omitempty"`
-		} `json:"environmentVariables,omitempty"`
+	RegistryType         string    `json:"registryType"`
+	RegistryBaseURL      string    `json:"registryBaseURL,omitempty"`
+	Identifier           string    `json:"identifier"`
+	Version              string    `json:"version,omitempty"`
+	Transport            Transport `json:"transport"`
+	EnvironmentVariables []struct {
+		Description string `json:"description"`
+		Name        string `json:"name"`
+		Format      string `json:"format,omitempty"`
+		IsSecret    bool   `json:"isSecret,omitempty"`
+	} `json:"environmentVariables,omitempty"`
 }
 
 type Transport struct {
@@ -59,20 +59,19 @@ type ReviewResult struct {
 	Comment string
 }
 
-
 type Pip struct {
-	Info map[string]interface{} `json:"info"`
-	LastSerial float64 `json:"last_serial"`
-	Urls []PipUrl `json:"urls"`
+	Info            map[string]interface{} `json:"info"`
+	LastSerial      float64                `json:"last_serial"`
+	Urls            []PipURL               `json:"urls"`
 	Vulnerabilities []struct {
-		Id         string `json:"id"`
+		ID         string `json:"id"`
 		Severity   string `json:"severity"`
 		Details    string `json:"details"`
 		FixVersion string `json:"fixVersion,omitempty"`
 	} `json:"vulnerabilities,omitempty"`
 }
 
-type PipUrl struct {
+type PipURL struct {
 	PackageType string `json:"packagetype"`
-	Url string `json:"url"`
+	URL         string `json:"url"`
 }

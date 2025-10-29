@@ -107,76 +107,14 @@ func DownloadAndExtractWheel(packageName string, version string) ([]string, erro
 }
 
 func findWheelURL(pip Pip, packageName, version string) (string, error) {
-
 	for _, url := range pip.Urls {
 		if url.PackageType == "bdist_wheel" {
-			return url.Url, nil
+			return url.URL, nil
 		}
 	}
 
 	// For now, return a placeholder - you'll need to implement JSON parsing
 	return "", fmt.Errorf("no wheel URL found for package %s version %s", packageName, version)
-}
-
-// extractWheel extracts a wheel file (which is a ZIP archive)
-func extractWheel(wheelPath, extractDir string) error {
-
-	//codeExtensions := map[string]bool{
-	//	".py": true,
-	//}
-	reader, err := zip.OpenReader(wheelPath)
-	if err != nil {
-		return fmt.Errorf("failed to open wheel as zip: %w", err)
-	}
-	defer reader.Close()
-
-	// Create extraction directory
-	err = os.MkdirAll(extractDir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create extract directory: %w", err)
-	}
-
-	// Extract files
-	for _, file := range reader.File {
-		path := filepath.Join(extractDir, file.Name)
-
-		// Ensure the file path is within extract directory (security check)
-		if !strings.HasPrefix(path, filepath.Clean(extractDir)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid file path: %s", file.Name)
-		}
-
-		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, file.FileInfo().Mode())
-			continue
-		}
-
-		// Create file directory if needed
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
-		}
-
-		// Extract file
-		fileReader, err := file.Open()
-		if err != nil {
-			return fmt.Errorf("failed to open file in wheel: %w", err)
-		}
-
-		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.FileInfo().Mode())
-		if err != nil {
-			fileReader.Close()
-			return fmt.Errorf("failed to create target file: %w", err)
-		}
-
-		_, err = io.Copy(targetFile, fileReader)
-		fileReader.Close()
-		targetFile.Close()
-
-		if err != nil {
-			return fmt.Errorf("failed to copy file content: %w", err)
-		}
-	}
-
-	return nil
 }
 
 func extractPythonCodeFromWheel(wheelPath string) ([]string, error) {
