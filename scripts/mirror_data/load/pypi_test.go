@@ -10,7 +10,6 @@ import (
 
 func TestScanPypiPackages(t *testing.T) {
 	type args struct {
-		ctx    context.Context
 		client *genai.Client
 		model  string
 		mcp    Server
@@ -43,12 +42,12 @@ func TestScanPypiPackages(t *testing.T) {
 		want    *PaloMeta
 		wantErr bool
 	}{
-		{"Pass", args{ctx, client, model, test}, nil, false},
-		{"EmptyPackages", args{ctx, client, model, Server{Packages: []Package{}}}, nil, true},
+		{"Pass", args{client, model, test}, nil, false},
+		{"EmptyPackages", args{client, model, Server{Packages: []Package{}}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ScanPypiPackages(tt.args.ctx, tt.args.client, tt.args.model, tt.args.mcp)
+			got, err := ScanPypiPackages(ctx, tt.args.client, tt.args.model, tt.args.mcp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ScanPypiPackages() error = %v, wantErr %v", err, tt.wantErr)
 				return
