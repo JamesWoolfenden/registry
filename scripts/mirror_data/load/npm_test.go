@@ -28,22 +28,8 @@ func TestScanNpmPackages(t *testing.T) {
 		Backend:  genai.BackendVertexAI,
 	})
 
-	type myPackage struct {
-		RegistryType string `json:"registryType"`
-		Identifier   string `json:"identifier"`
-		Transport    struct {
-			Type string `json:"type"`
-		} `json:"transport"`
-		EnvironmentVariables []struct {
-			Description string `json:"description"`
-			Name        string `json:"name"`
-			Format      string `json:"format,omitempty"`
-			IsSecret    bool   `json:"isSecret,omitempty"`
-		} `json:"environmentVariables,omitempty"`
-	}
-
 	var mcp, mcp2, mcp3 Server
-	var pack myPackage
+	var pack Package
 
 	mcp2.Packages = append(mcp2.Packages, pack)
 	mcp3.Packages = append(mcp3.Packages, pack)

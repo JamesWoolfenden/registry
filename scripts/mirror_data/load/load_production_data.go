@@ -25,7 +25,7 @@ type Config struct {
 
 func loadConfig() *Config {
 	return &Config{
-		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy.json"),
+		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy_pip.json"),
 		SkipMigrations: getEnvBool("SKIP_MIGRATIONS", true),
 		DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
 		BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),
@@ -421,6 +421,16 @@ func review(ctx context.Context, value []uint8) ([]byte, error) {
 			{
 				log.Info().Msgf("Skipping OCI registry type: %s", first.RegistryType)
 				// docker?
+			}
+		case "pypi":
+			{
+				paloMeta, err = ScanPypiPackages(ctx, client, model, mcp)
+				AuthorAnalysis(paloMeta)
+
+				if err != nil {
+					log.Info().Msgf("Failed to scan NPM packages: %v", err)
+					break
+				}
 			}
 		}
 	}

@@ -23,19 +23,25 @@ type Server struct {
 		ID     string `json:"id,omitempty"`
 	} `json:"repository,omitempty"`
 	Version  string `json:"version"`
-	Packages []struct {
+	Packages []Package`json:"packages"`
+}
+
+type Package struct {
 		RegistryType string `json:"registryType"`
+		RegistryBaseUrl string `json:"registryBaseUrl,omitempty"`
 		Identifier   string `json:"identifier"`
-		Transport    struct {
-			Type string `json:"type"`
-		} `json:"transport"`
+		Version      string `json:"version,omitempty"`
+		Transport    Transport `json:"transport"`
 		EnvironmentVariables []struct {
 			Description string `json:"description"`
 			Name        string `json:"name"`
 			Format      string `json:"format,omitempty"`
 			IsSecret    bool   `json:"isSecret,omitempty"`
 		} `json:"environmentVariables,omitempty"`
-	} `json:"packages"`
+}
+
+type Transport struct {
+	Type string `json:"type"`
 }
 
 type npmRegistryResponse struct {
@@ -51,4 +57,22 @@ type ReviewResult struct {
 	File    string
 	Score   int
 	Comment string
+}
+
+
+type Pip struct {
+	Info map[string]interface{} `json:"info"`
+	LastSerial float64 `json:"last_serial"`
+	Urls []PipUrl `json:"urls"`
+	Vulnerabilities []struct {
+		Id         string `json:"id"`
+		Severity   string `json:"severity"`
+		Details    string `json:"details"`
+		FixVersion string `json:"fixVersion,omitempty"`
+	} `json:"vulnerabilities,omitempty"`
+}
+
+type PipUrl struct {
+	PackageType string `json:"packagetype"`
+	Url string `json:"url"`
 }
