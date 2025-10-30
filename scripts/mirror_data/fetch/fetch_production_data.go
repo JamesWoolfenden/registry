@@ -5,20 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-)
-
-const (
-	exportData = "scripts/mirror_data/fetch/production_servers.json"
-	baseURL    = "https://registry.modelcontextprotocol.io/v0/servers"
-	timeout    = 30 * time.Second
-	rateLimit  = 100 * time.Millisecond
+	"github.com/urfave/cli/v2"
 )
 
 type ServerResponse struct {
@@ -30,35 +24,99 @@ type ServerResponse struct {
 }
 
 type Fetcher struct {
-	client  *http.Client
-	baseURL string
+	client    *http.Client
+	baseURL   string
+	rateLimit time.Duration
 }
 
-func NewFetcher() *Fetcher {
+func NewFetcher(config Config) *Fetcher {
 	return &Fetcher{
 		client: &http.Client{
-			Timeout: timeout,
+			Timeout: config.Timeout,
 		},
-		baseURL: baseURL,
+		baseURL:   config.BaseURL,
+		rateLimit: config.RateLimit,
 	}
 }
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	app := &cli.App{
+		Name:  "fetch-production-data",
+		Usage: "Fetch production data from MCP registry",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "export-data",
+				Aliases: []string{"e"},
+				Value:   "scripts/mirror_data/fetch/production_servers.json",
+				Usage:   "Path to export data file",
+			},
+			&cli.StringFlag{
+				Name:    "base-url",
+				Aliases: []string{"u"},
+				Value:   "https://registry.modelcontextprotocol.io/v0/servers",
+				Usage:   "Base URL for the registry API",
+			},
+			&cli.DurationFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Value:   30 * time.Second,
+				Usage:   "Request timeout duration",
+			},
+			&cli.DurationFlag{
+				Name:    "rate-limit",
+				Aliases: []string{"r"},
+				Value:   100 * time.Millisecond,
+				Usage:   "Rate limit between requests",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			config := Config{
+				ExportData: c.String("export-data"),
+				BaseURL:    c.String("base-url"),
+				Timeout:    c.Duration("timeout"),
+				RateLimit:  c.Duration("rate-limit"),
+			}
 
-	fetcher := NewFetcher()
+			return fetchProductionData(config)
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+
+type Config struct {
+	ExportData string
+	BaseURL    string
+	Timeout    time.Duration
+	RateLimit  time.Duration
+}
+
+func fetchProductionData(config Config) error {
+	// Make export data path absolute
+	if !filepath.IsAbs(config.ExportData) {
+		var err error
+		config.ExportData, err = filepath.Abs(config.ExportData)
+		if err != nil {
+			return fmt.Errorf("failed to convert to absolute path: %w", err)
+		}
+	}
+
+	fetcher := NewFetcher(config)
 
 	ctx := context.Background()
 	allServers, err := fetcher.fetchAll(ctx)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to fetch servers")
+		return fmt.Errorf("failed to fetch servers: %w", err)
 	}
 
-	if err := saveToFile(allServers, exportData); err != nil {
-		log.Fatal().Err(err).Msg("Failed to save data")
+	if err := saveToFile(allServers, config.ExportData); err != nil {
+		return fmt.Errorf("failed to save data: %w", err)
 	}
 
-	log.Info().Msgf("Successfully saved %d servers to %s", len(allServers), exportData)
+	fmt.Printf("Successfully saved %d servers to %s\n", len(allServers), config.ExportData)
+	return nil
 }
 
 func (f *Fetcher) fetchAll(ctx context.Context) ([]json.RawMessage, error) {
@@ -75,7 +133,7 @@ func (f *Fetcher) fetchAll(ctx context.Context) ([]json.RawMessage, error) {
 		}
 
 		allServers = append(allServers, servers...)
-		log.Info().Msgf("Page %d: got %d servers (total: %d)", pageCount, len(servers), len(allServers))
+		fmt.Printf("Page %d: got %d servers (total: %d)\n", pageCount, len(servers), len(allServers))
 
 		if nextCursor == "" {
 			break
@@ -84,7 +142,7 @@ func (f *Fetcher) fetchAll(ctx context.Context) ([]json.RawMessage, error) {
 
 		// Rate limiting
 		select {
-		case <-time.After(rateLimit):
+		case <-time.After(f.rateLimit):
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
@@ -99,7 +157,7 @@ func (f *Fetcher) fetchPage(ctx context.Context, cursor string, pageNum int) ([]
 		requestURL = fmt.Sprintf("%s?cursor=%s", f.baseURL, url.QueryEscape(cursor))
 	}
 
-	log.Info().Msgf("Fetching page %d: %s", pageNum, requestURL)
+	fmt.Printf("Fetching page %d: %s\n", pageNum, requestURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
@@ -114,7 +172,7 @@ func (f *Fetcher) fetchPage(ctx context.Context, cursor string, pageNum int) ([]
 
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
-			log.Warn().Err(closeErr).Msg("Failed to close response body")
+			fmt.Printf("Warning: Failed to close response body: %v\n", closeErr)
 		}
 	}()
 
@@ -147,8 +205,14 @@ func saveToFile(servers []json.RawMessage, filename string) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
+	// Ensure filename is an absolute path
+	absFilename, err := filepath.Abs(filename)
+	if err != nil {
+		return fmt.Errorf("failed to convert to absolute path: %w", err)
+	}
+
 	// #nosec G306
-	if err := os.WriteFile(filename, data, 0644); err != nil {
+	if err := os.WriteFile(absFilename, data, 0644); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
 

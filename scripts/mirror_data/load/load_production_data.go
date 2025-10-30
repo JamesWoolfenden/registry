@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -11,6 +12,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/genai"
 )
 
@@ -24,8 +26,17 @@ type Config struct {
 }
 
 func loadConfig() *Config {
+	var exportDataPath string
+	flag.StringVar(&exportDataPath, "export-data-path", "", "Path to export data file")
+	flag.StringVar(&exportDataPath, "e", "", "Path to export data file (short alias)")
+	flag.Parse()
+
+	if exportDataPath == "" {
+		exportDataPath = getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy.json")
+	}
+
 	return &Config{
-		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy.json"),
+		ExportDataPath: exportDataPath,
 		SkipMigrations: getEnvBool("SKIP_MIGRATIONS", true),
 		DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
 		BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),
@@ -37,21 +48,44 @@ func loadConfig() *Config {
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	// Create context with timeout
-	err := transaction()
-	if err != nil {
-		log.Fatal().Err(err).Msg("load failed")
+	app := &cli.App{
+		Name:  "load-production-data",
+		Usage: "Load production data into MCP registry database",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "export-data-path",
+				Aliases: []string{"e"},
+				Value:   "scripts/mirror_data/fetch/production_dodgy.json",
+				Usage:   "Path to the exported production data JSON file",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			// Create config with CLI parameter and environment variables
+			config := &Config{
+				ExportDataPath: c.String("export-data-path"),
+				SkipMigrations: getEnvBool("SKIP_MIGRATIONS", true),
+				DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
+				BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),
+				MaxMigration:   getEnvInt("MAX_MIGRATION", 7),
+				GCPProject:     getEnv("GCP_PROJECT", "ocpoit"),
+			}
+
+			// Call transaction with the config
+			return transaction(config)
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal().Err(err).Msg("Application failed")
 	}
 }
 
-// Usage in main transaction function
-func transaction() error {
+// Update transaction to accept and use config
+func transaction(config *Config) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	config := loadConfig()
-
-	// Database connection
+	// Database connection using config
 	db, err := sql.Open("postgres", config.DataSource)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
@@ -72,8 +106,8 @@ func transaction() error {
 		}
 	}
 
-	// Use batched importer instead of single transaction
-	err = importerWithContext(ctx, db)
+	// Pass config to importer
+	err = importerWithContext(ctx, db, config)
 	if err != nil {
 		return fmt.Errorf("failed to import production server data: %w", err)
 	}
@@ -201,9 +235,7 @@ func verifyWithContext(ctx context.Context, db *sql.DB, maxMigration int) error 
 }
 
 // Updated importer with batched transactions
-func importerWithContext(ctx context.Context, db *sql.DB) error {
-	config := loadConfig()
-
+func importerWithContext(ctx context.Context, db *sql.DB, config *Config) error {
 	// Load production data
 	log.Info().Msg("\nLoading production data...")
 
@@ -237,7 +269,7 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 
 		log.Info().Msgf("Processing batch %d/%d (%d records)...", batchNum, totalBatches, len(batch))
 
-		err := processBatch(ctx, db, batch, batchStart)
+		err := processBatch(ctx, db, batch, batchStart, config)
 		if err != nil {
 			log.Error().Msgf("Failed to process batch %d: %v", batchNum, err)
 			// Continue with next batch instead of failing completely
@@ -252,7 +284,7 @@ func importerWithContext(ctx context.Context, db *sql.DB) error {
 }
 
 // Process a single batch of servers in a transaction
-func processBatch(ctx context.Context, db *sql.DB, batch []json.RawMessage, startIndex int) error {
+func processBatch(ctx context.Context, db *sql.DB, batch []json.RawMessage, startIndex int, config *Config) error {
 	// Start transaction for this batch
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -287,7 +319,7 @@ func processBatch(ctx context.Context, db *sql.DB, batch []json.RawMessage, star
 	for i, server := range batch {
 		globalIndex := startIndex + i
 
-		err := processServerRecord(ctx, db, tx, stmt, server, globalIndex)
+		err := processServerRecord(ctx, db, tx, stmt, server, globalIndex, config)
 		if err != nil {
 			log.Warn().Msgf("Failed to process server %d: %v", globalIndex, err)
 			errorCount++
@@ -308,7 +340,7 @@ func processBatch(ctx context.Context, db *sql.DB, batch []json.RawMessage, star
 }
 
 // Process a single server record
-func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.Stmt, server json.RawMessage, index int) error {
+func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.Stmt, server json.RawMessage, index int, config *Config) error {
 	var rawText map[string]interface{}
 	if err := json.Unmarshal(server, &rawText); err != nil {
 		return fmt.Errorf("failed to unmarshal: %w", err)
@@ -367,7 +399,7 @@ func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.
 	}
 
 	// Generate review for new server
-	paloMeta, err := review(ctx, value)
+	paloMeta, err := review(ctx, value, config)
 	if err != nil {
 		return fmt.Errorf("failed to generate review: %w", err)
 	}
@@ -382,9 +414,9 @@ func processServerRecord(ctx context.Context, db *sql.DB, tx *sql.Tx, stmt *sql.
 	return nil
 }
 
-func review(ctx context.Context, value []uint8) ([]byte, error) {
+func review(ctx context.Context, value []uint8, config *Config) ([]byte, error) {
 	const model = "gemini-2.5-flash"
-	config := loadConfig()
+	//config := loadConfig()
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Project:  config.GCPProject,
