@@ -25,7 +25,7 @@ type Config struct {
 
 func loadConfig() *Config {
 	return &Config{
-		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy_pip.json"),
+		ExportDataPath: getEnv("EXPORT_DATA_PATH", "scripts/mirror_data/fetch/production_dodgy.json"),
 		SkipMigrations: getEnvBool("SKIP_MIGRATIONS", true),
 		DataSource:     getEnv("DATABASE_URL", "postgres://mcpregistry:mcpregistry@localhost:5432/mcp-registry?sslmode=disable"),
 		BaseURL:        getEnv("BASE_URL", "http://localhost:8080/v0/servers"),

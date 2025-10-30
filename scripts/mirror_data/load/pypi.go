@@ -53,7 +53,12 @@ func DownloadAndExtractWheel(packageName string, version string) ([]string, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to get package metadata: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close response body: %v", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to download package: %s", resp.Status)
@@ -78,7 +83,12 @@ func DownloadAndExtractWheel(packageName string, version string) ([]string, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to download wheel: %w", err)
 	}
-	defer wheelResp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close response body: %v", err)
+		}
+	}(wheelResp.Body)
 
 	// Create temporary file for wheel
 	tempDir := os.TempDir()
@@ -88,7 +98,12 @@ func DownloadAndExtractWheel(packageName string, version string) ([]string, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create wheel file: %w", err)
 	}
-	defer wheelFile.Close()
+	defer func(wheelFile *os.File) {
+		err := wheelFile.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close response body: %v", err)
+		}
+	}(wheelFile)
 
 	// Copy wheel content to file
 	_, err = io.Copy(wheelFile, wheelResp.Body)
@@ -124,7 +139,12 @@ func extractPythonCodeFromWheel(wheelPath string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open wheel as zip: %w", err)
 	}
-	defer reader.Close()
+	defer func(reader *zip.ReadCloser) {
+		err := reader.Close()
+		if err != nil {
+			log.Error().Msgf("Failed to close response body: %v", err)
+		}
+	}(reader)
 
 	// Extract Python files directly from ZIP
 	for _, file := range reader.File {
@@ -147,11 +167,15 @@ func extractPythonCodeFromWheel(wheelPath string) ([]string, error) {
 
 		// Read file content
 		content, err := io.ReadAll(fileReader)
-		fileReader.Close()
 
 		if err != nil {
 			log.Warn().Msgf("Failed to read file %s: %v", file.Name, err)
 			continue
+		}
+
+		err = fileReader.Close()
+		if err != nil {
+			return nil, err
 		}
 
 		// Add to collection
