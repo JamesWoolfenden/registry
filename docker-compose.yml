@@ -48,3 +48,16 @@ services:
     ports:
       - "5432:5432"
     restart: "unless-stopped"
+
+  pwgeb:
+    image: sosedoff/pgweb
+    container_name: pwgeb
+    restart: always
+    ports:
+      - "8081:8081"
+    links:
+      - postgres:postgres # my database container is called postgres, not db
+    environment:
+      - PGWEB_DATABASE_URL=postgres://mcpregistry:mcpregistry@postgres:5432/mcp-registry?sslmode=disable
+    depends_on:
+      - postgres
